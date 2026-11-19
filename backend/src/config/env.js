@@ -62,6 +62,7 @@ const schema = z
 
     THROTTLE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(300),
     AUTH_THROTTLE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(20),
+    REFRESH_THROTTLE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(120),
   })
   .superRefine((env, ctx) => {
     const need = (keys, why) =>
@@ -76,6 +77,7 @@ const schema = z
       if (!env.COOKIE_SECURE) ctx.addIssue({ code: 'custom', path: ['COOKIE_SECURE'], message: 'must be true in production' });
       if (env.CORS_ORIGINS.includes('*')) ctx.addIssue({ code: 'custom', path: ['CORS_ORIGINS'], message: 'wildcard CORS is not allowed' });
       if (env.STORAGE_DRIVER !== 's3') ctx.addIssue({ code: 'custom', path: ['STORAGE_DRIVER'], message: 'use s3 in production' });
+      if (env.MAIL_PROVIDER === 'log') ctx.addIssue({ code: 'custom', path: ['MAIL_PROVIDER'], message: 'log provider is not allowed in production' });
     }
   });
 

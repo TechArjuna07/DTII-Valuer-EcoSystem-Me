@@ -89,9 +89,26 @@ model Organization {
   settings            OrganizationSettings?
   userRoles           UserRole[]
   firmRolePermissions FirmRolePermission[]
+  employees           EmployeeProfile[]
+  clients             Client[]
+  sequences           FirmSequence[]
 
   @@index([status])
   @@map("organizations")
+}
+
+/// Per-firm human-readable code counters (EMP-000001, CLT-000001). Incremented with a row-locking upsert
+/// inside the business transaction, so codes are unique and gap-free (a rollback releases the number).
+model FirmSequence {
+  firmId    String   @map("firm_id") @db.Uuid
+  entity    String   @db.VarChar(20)
+  lastValue BigInt   @default(0) @map("last_value")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [firmId], references: [id], onDelete: Restrict)
+
+  @@id([firmId, entity])
+  @@map("firm_sequences")
 }
 
 /// Firm-level configuration. Secrets (SMTP) are AES-256-GCM encrypted and never returned by the API.
@@ -134,9 +151,93 @@ model User {
   roles      UserRole[]
   sessions   UserSession[]
   authTokens AuthToken[]
+  employee   EmployeeProfile[]
+  clients    Client[]
 
   @@index([status])
   @@map("users")
+}
+
+// ───────────────────────────── Firm masters: employees & clients ─────────────────────────────
+
+enum ClientType {
+  INDIVIDUAL
+  PROPRIETORSHIP
+  PARTNERSHIP
+  LLP
+  PRIVATE_LIMITED
+  PUBLIC_LIMITED
+  HUF
+  TRUST
+  OTHER
+}
+
+/// Firm employee (one per user per firm). Roles are held in user_roles.
+model EmployeeProfile {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId         String       @map("firm_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  employeeCode   String       @map("employee_code") @db.VarChar(20)
+  designation    String?      @db.VarChar(100)
+  department     String?      @db.VarChar(100)
+  /// IBBI / bank empanelment / engineer registration number (shown on signed reports).
+  registrationNo String?      @map("registration_no") @db.VarChar(64)
+  dateOfJoining  DateTime?    @map("date_of_joining") @db.Date
+  status         RecordStatus @default(ACTIVE)
+  createdById    String?      @map("created_by_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([firmId, id])
+  @@unique([firmId, userId])
+  @@unique([firmId, employeeCode])
+  @@index([firmId, status])
+  @@map("employee_profiles")
+}
+
+/// Firm client (loan applicant / property owner). PAN is AES-256-GCM encrypted; pan_hmac allows duplicate
+/// detection without decrypting. user_id links the optional client-portal login.
+model Client {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId        String       @map("firm_id") @db.Uuid
+  clientCode    String       @map("client_code") @db.VarChar(20)
+  clientType    ClientType   @map("client_type")
+  name          String       @db.VarChar(200)
+  contactPerson String?      @map("contact_person") @db.VarChar(150)
+  email         String?      @db.Citext
+  phone         String?      @db.VarChar(20)
+  altPhone      String?      @map("alt_phone") @db.VarChar(20)
+  panEnc        Bytes?       @map("pan_enc")
+  panHmac       String?      @map("pan_hmac") @db.VarChar(64)
+  panLast4      String?      @map("pan_last4") @db.VarChar(4)
+  gstin         String?      @db.VarChar(15)
+  addressLine1  String?      @map("address_line1") @db.VarChar(200)
+  addressLine2  String?      @map("address_line2") @db.VarChar(200)
+  city          String?      @db.VarChar(100)
+  state         String?      @db.VarChar(100)
+  pincode       String?      @db.VarChar(10)
+  notes         String?      @db.VarChar(1000)
+  userId        String?      @map("user_id") @db.Uuid
+  status        RecordStatus @default(ACTIVE)
+  createdById   String?      @map("created_by_id") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt     DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([firmId, id])
+  @@unique([firmId, clientCode])
+  @@unique([firmId, panHmac])
+  @@unique([firmId, userId])
+  @@index([firmId, status])
+  @@index([firmId, name])
+  @@map("clients")
 }
 
 /// System roles: SUPER_ADMIN (platform), FIRM_ADMIN, MARKETING, FIELD_OFFICER, JUNIOR_REVIEWER, SENIOR_REVIEWER, CLIENT.
@@ -239,6 +340,8 @@ model UserSession {
   lastUsedAt    DateTime  @default(now()) @map("last_used_at") @db.Timestamptz(3)
   expiresAt     DateTime  @map("expires_at") @db.Timestamptz(3)
   rotatedAt     DateTime? @map("rotated_at") @db.Timestamptz(3)
+  /// Successor session after rotation (used for the concurrent-tab grace window).
+  replacedById  String?   @map("replaced_by_id") @db.Uuid
   revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(3)
   revokedReason String?   @map("revoked_reason") @db.VarChar(40)
 

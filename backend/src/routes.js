@@ -1,9 +1,19 @@
 import { Router } from 'express';
 import health from './modules/health/health.routes.js';
+import auth from './modules/auth/auth.routes.js';
+import platform from './modules/organizations/organizations.routes.js';
+import employees from './modules/employees/employees.routes.js';
+import clients from './modules/clients/clients.routes.js';
+import firm from './modules/firm/firm.routes.js';
 
 /** /api/v1 router. Each module mounts its own router here. */
 const v1 = Router();
 
 v1.use('/health', health);
+v1.use('/auth', auth);
+v1.use('/platform', platform);
+v1.use('/firm', firm);
+v1.use('/employees', employees);
+v1.use('/clients', clients);
 
 export { v1 };

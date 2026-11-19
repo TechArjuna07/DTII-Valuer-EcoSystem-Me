@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../../database/prisma.js';
 import { redis } from '../../database/redis.js';
+import { documentRoute } from '../../docs/registry.js';
 
 const router = Router();
 
@@ -32,4 +33,7 @@ router.get('/ready', async (_req, res) => {
     .json(ok ? { status: 'ok', checks } : { statusCode: 503, error: 'SERVICE_UNAVAILABLE', status: 'error', checks, message: 'Dependency check failed' });
 });
 
+
+documentRoute({ method: 'get', path: '/health/live', tag: 'Health', summary: 'Liveness probe', auth: false });
+documentRoute({ method: 'get', path: '/health/ready', tag: 'Health', summary: 'Readiness probe (PostgreSQL, Redis); 503 when degraded', auth: false });
 export default router;

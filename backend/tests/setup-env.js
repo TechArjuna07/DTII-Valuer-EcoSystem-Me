@@ -17,3 +17,8 @@ if (process.env.REDIS_URL) {
 process.env.QUEUE_PREFIX = 'valuers-test';
 process.env.COOKIE_SECURE = 'false';
 process.env.STORAGE_LOCAL_ROOT = './.test-storage';
+process.env.MAIL_PROVIDER = 'log';
+// Tests log in many times from one IP; rate limiting itself is covered by a dedicated test.
+process.env.AUTH_THROTTLE_LIMIT_PER_MINUTE = '10000';
+process.env.REFRESH_THROTTLE_LIMIT_PER_MINUTE = '10000';
+process.env.THROTTLE_LIMIT_PER_MINUTE = '100000';

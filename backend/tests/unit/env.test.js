@@ -36,7 +36,7 @@ describe('environment validation', () => {
   });
 
   test('production hardening: secure cookies, malware scanning, S3, no wildcard CORS', () => {
-    const prod = { ...valid, NODE_ENV: 'production' };
+    const prod = { ...valid, NODE_ENV: 'production', MAIL_PROVIDER: 'gmail', GMAIL_SMTP_USER: 'u@example.com', GMAIL_SMTP_APP_PASSWORD: 'app-pass' };
     expect(() => loadEnv(prod)).toThrow(/SCANNER/);
     expect(() => loadEnv({ ...prod, SCANNER: 'clamav', COOKIE_SECURE: 'false', STORAGE_DRIVER: 's3', S3_BUCKET: 'b' })).toThrow(/COOKIE_SECURE/);
     expect(() => loadEnv({ ...prod, SCANNER: 'clamav', STORAGE_DRIVER: 'local' })).toThrow(/STORAGE_DRIVER/);

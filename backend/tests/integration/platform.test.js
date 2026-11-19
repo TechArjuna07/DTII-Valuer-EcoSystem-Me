@@ -96,3 +96,18 @@ describe('database baseline', () => {
     await expect(prisma.user.create({ data: { email: email.toUpperCase(), fullName: 'Dup' } })).rejects.toThrow();
   });
 });
+
+describe('rate limiting', () => {
+  test('a Redis-backed limiter answers 429 with a JSON body once the budget is spent', async () => {
+    const { default: express } = await import('express');
+    const { createLimiter } = await import('../../src/middleware/rate-limit.js');
+    const mini = express();
+    mini.get('/x', createLimiter(`test-${Date.now()}`, 2), (_req, res) => res.json({ ok: true }));
+    expect((await request(mini).get('/x')).status).toBe(200);
+    expect((await request(mini).get('/x')).status).toBe(200);
+    const blocked = await request(mini).get('/x');
+    expect(blocked.status).toBe(429);
+    expect(blocked.body).toMatchObject({ statusCode: 429, error: 'TOO_MANY_REQUESTS' });
+    expect(blocked.headers.ratelimit).toBeDefined();
+  });
+});

@@ -30,6 +30,8 @@ const limiters = {
   global: createLimiter('global', env.THROTTLE_LIMIT_PER_MINUTE),
   /** Login / reset / invite: strict per-IP limit (per-account lockout applies as well). */
   auth: createLimiter('auth', env.AUTH_THROTTLE_LIMIT_PER_MINUTE),
+  /** Refresh runs on every page load / tab, so it has its own budget. */
+  refresh: createLimiter('refresh', env.REFRESH_THROTTLE_LIMIT_PER_MINUTE),
 };
 
 export { limiters, createLimiter };

@@ -18,6 +18,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:test": "node scripts/migrate-test.js",
     "db:seed": "node prisma/seed/index.js",
+    "db:seed:superadmin": "node prisma/seed/superadmin.js",
     "db:status": "prisma migrate status"
   },
   "prisma": {
@@ -35,6 +36,7 @@
     "helmet": "^8.0.0",
     "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^7",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
     "rate-limit-redis": "^4.2.0",
