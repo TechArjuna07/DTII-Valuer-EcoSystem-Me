@@ -1,0 +1,22 @@
+{
+  "name": "dtii-valuers-ecosystem",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Valuers Ecosystem - multi-tenant valuation firm management & digital workflow platform",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.11 <23"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @valuers/backend dev",
+    "dev:web": "pnpm --filter @valuers/frontend dev",
+    "build": "pnpm --filter @valuers/frontend build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm --filter @valuers/backend test",
+    "db:migrate": "pnpm --filter @valuers/backend db:migrate",
+    "db:seed": "pnpm --filter @valuers/backend db:seed",
+    "redis:up": "docker compose -f infra/redis/docker-compose.yml --env-file infra/redis/.env up -d",
+    "redis:stop": "docker compose -f infra/redis/docker-compose.yml --env-file infra/redis/.env stop",
+    "redis:status": "docker ps --filter name=valuers-redis"
+  }
+}

@@ -1,0 +1,28 @@
+# Dependencies & builds
+node_modules/
+dist/
+coverage/
+*.log
+.vite/
+
+# Secrets: never commit real environment files
+.env
+.env.*
+!.env.example
+
+# Local document storage & backups
+backend/storage/
+backend/.test-storage/
+backups/
+*.dump
+
+# Test artefacts
+frontend/playwright-report/
+frontend/test-results/
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
