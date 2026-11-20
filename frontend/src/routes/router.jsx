@@ -104,6 +104,24 @@ export const router = createBrowserRouter([
                   { path: '/clients/:id', element: L(() => import('@/pages/clients/ClientDetailPage')) },
                 ],
               },
+              {
+                element: <RequireAuth context="FIRM" permissions={['case.view', 'portal.access']} any />,
+                children: [
+                  { path: '/cases', element: L(() => import('@/pages/cases/CasesListPage')) },
+                  { path: '/cases/:id', element: L(() => import('@/pages/cases/CaseDetailPage')) },
+                ],
+              },
+              { element: <RequireAuth context="FIRM" permissions={['case.create']} />, children: [{ path: '/cases/new', element: L(() => import('@/pages/cases/CaseNewPage')) }] },
+              {
+                element: <RequireAuth context="FIRM" permissions={['master.manage']} />,
+                children: [
+                  { path: '/masters/banks', element: L(() => import('@/pages/masters/BanksPage')) },
+                  { path: '/masters/categories', element: L(() => import('@/pages/masters/CategoriesPage')) },
+                  { path: '/masters/document-types', element: L(() => import('@/pages/masters/DocumentTypesPage')) },
+                  { path: '/masters/financial-years', element: L(() => import('@/pages/masters/FinancialYearsPage')) },
+                ],
+              },
+              { element: <RequireAuth context="FIRM" permissions={['workflow.config.manage']} />, children: [{ path: '/masters/workflow', element: L(() => import('@/pages/masters/WorkflowSettingsPage')) }] },
               { element: <RequireAuth context="FIRM" permissions={['rbac.manage']} />, children: [{ path: '/roles-permissions', element: L(() => import('@/pages/admin/RolesPermissionsPage')) }] },
               { element: <RequireAuth context="FIRM" permissions={['audit.view']} />, children: [{ path: '/audit-logs', element: L(() => import('@/pages/admin/FirmAuditPage')) }] },
               { element: <RequireAuth context="FIRM" permissions={['firm.settings.manage']} />, children: [{ path: '/firm-profile', element: L(() => import('@/pages/admin/FirmProfilePage')) }] },

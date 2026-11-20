@@ -1,4 +1,4 @@
-import { Building2, Landmark, LayoutDashboard, ScrollText, Settings, ShieldCheck, UserRound, Users } from 'lucide-react';
+import { Building2, CalendarRange, FileType2, FolderKanban, Layers, Landmark, LayoutDashboard, Route, ScrollText, Settings, ShieldCheck, UserRound, Users } from 'lucide-react';
 
 /**
  * Sidebar navigation. Items are shown by CONTEXT (platform / firm) and PERMISSION, so each role only sees
@@ -22,15 +22,24 @@ export const NAV = [
     ],
   },
   {
+    section: 'Work',
+    items: [{ href: '/cases', label: 'Cases', icon: FolderKanban, context: 'FIRM', any: ['case.view', 'portal.access'] }],
+  },
+  {
     section: 'Masters',
     items: [
       { href: '/clients', label: 'Clients', icon: Building2, context: 'FIRM', any: ['client.manage'] },
       { href: '/employees', label: 'Employees', icon: Users, context: 'FIRM', any: ['employee.manage'] },
+      { href: '/masters/banks', label: 'Banks & NBFCs', icon: Landmark, context: 'FIRM', any: ['master.manage'] },
+      { href: '/masters/categories', label: 'Valuation Categories', icon: Layers, context: 'FIRM', any: ['master.manage'] },
+      { href: '/masters/document-types', label: 'Document Types', icon: FileType2, context: 'FIRM', any: ['master.manage'] },
+      { href: '/masters/financial-years', label: 'Financial Years', icon: CalendarRange, context: 'FIRM', any: ['master.manage'] },
     ],
   },
   {
     section: 'Administration',
     items: [
+      { href: '/masters/workflow', label: 'Workflow Settings', icon: Route, context: 'FIRM', any: ['workflow.config.manage'] },
       { href: '/roles-permissions', label: 'Roles & Permissions', icon: ShieldCheck, context: 'FIRM', any: ['rbac.manage'] },
       { href: '/audit-logs', label: 'Audit Trail', icon: ScrollText, context: 'FIRM', any: ['audit.view'] },
       { href: '/firm-profile', label: 'Firm Profile', icon: Settings, context: 'FIRM', any: ['firm.settings.manage'] },

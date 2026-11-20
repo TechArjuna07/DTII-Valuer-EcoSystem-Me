@@ -8,6 +8,7 @@ import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { ROLE_DEFINITIONS, PERMISSION_DEFINITIONS } from '../../src/config/rbac.js';
 import { fyFromStartYear, fyStartYear } from '../../src/utils/financial-year.js';
+import { seedMasters } from './masters.js';
 
 /** First FY offered in masters; the seed also creates the next FY so April roll-over needs no manual step. */
 const FIRST_FY_START = 2024;
@@ -61,7 +62,7 @@ async function seedFinancialYears(prisma, today = new Date()) {
 }
 
 async function seedReferenceData(prisma) {
-  return { ...(await seedRbac(prisma)), ...(await seedFinancialYears(prisma)) };
+  return { ...(await seedRbac(prisma)), ...(await seedFinancialYears(prisma)), ...(await seedMasters(prisma)) };
 }
 
 async function main() {

@@ -92,6 +92,11 @@ model Organization {
   employees           EmployeeProfile[]
   clients             Client[]
   sequences           FirmSequence[]
+  banks               Bank[]
+  categories          ValuationCategory[]
+  documentTypes       DocumentType[]
+  cases               ValuationCase[]
+  caseCounters        CaseCounter[]
 
   @@index([status])
   @@map("organizations")
@@ -192,6 +197,8 @@ model EmployeeProfile {
   organization Organization @relation(fields: [firmId], references: [id], onDelete: Restrict)
   user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
 
+  assignments CaseAssignment[]
+
   @@unique([firmId, id])
   @@unique([firmId, userId])
   @@unique([firmId, employeeCode])
@@ -230,6 +237,7 @@ model Client {
 
   organization Organization @relation(fields: [firmId], references: [id], onDelete: Restrict)
   user         User?        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  cases        ValuationCase[]
 
   @@unique([firmId, id])
   @@unique([firmId, clientCode])
@@ -383,6 +391,9 @@ model FinancialYear {
   createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  cases    ValuationCase[]
+  counters CaseCounter[]
+
   @@map("financial_years")
 }
 
@@ -408,4 +419,271 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([action])
   @@map("audit_logs")
+}
+
+// ───────────────────────────── Phase 4: masters & case management ─────────────────────────────
+
+enum InstitutionType {
+  BANK
+  NBFC
+  HFC
+  COOPERATIVE_BANK
+  OTHER
+}
+
+/// Bank / NBFC master (per firm; one row per institution branch the firm is empanelled with).
+model Bank {
+  id                     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId                 String          @map("firm_id") @db.Uuid
+  institutionType        InstitutionType @map("institution_type")
+  name                   String          @db.VarChar(150)
+  /// Short code used in repository folder names, e.g. HDFC, SBI.
+  shortCode              String          @map("short_code") @db.VarChar(20)
+  branch                 String?         @db.VarChar(150)
+  ifsc                   String?         @db.VarChar(11)
+  contactPerson          String?         @map("contact_person") @db.VarChar(150)
+  email                  String?         @db.Citext
+  phone                  String?         @db.VarChar(20)
+  address                String?         @db.VarChar(400)
+  /// Whether this lender requires client approval + signature before submission.
+  requiresClientApproval Boolean         @default(true) @map("requires_client_approval")
+  status                 RecordStatus    @default(ACTIVE)
+  createdById            String?         @map("created_by_id") @db.Uuid
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt              DateTime?       @map("deleted_at") @db.Timestamptz(3)
+
+  organization Organization    @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  cases        ValuationCase[]
+
+  @@unique([firmId, id])
+  @@index([firmId, status])
+  @@map("banks")
+}
+
+/// Valuation category (Land & Building, Plant & Machinery, Stock…). firm_id NULL = platform category for all firms.
+model ValuationCategory {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId        String?  @map("firm_id") @db.Uuid
+  code          String   @db.VarChar(40)
+  name          String   @db.VarChar(100)
+  description   String?  @db.VarChar(400)
+  /// Calculation engine used by valuation reports: LAND_BUILDING | PLANT_MACHINERY | STOCK.
+  engine        String   @db.VarChar(40)
+  fieldsVersion Int      @default(1) @map("fields_version")
+  active        Boolean  @default(true)
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization?             @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  fields       CategoryFieldDefinition[]
+  cases        ValuationCase[]
+
+  @@index([firmId, active])
+  @@map("valuation_categories")
+}
+
+/// Configurable property/asset field of a category (rendered as a dynamic form, validated server-side).
+model CategoryFieldDefinition {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId String   @map("category_id") @db.Uuid
+  section    String   @db.VarChar(80)
+  key        String   @db.VarChar(60)
+  label      String   @db.VarChar(120)
+  /// TEXT | TEXTAREA | NUMBER | AREA | CURRENCY | DATE | SELECT | BOOLEAN
+  type       String   @db.VarChar(20)
+  required   Boolean  @default(false)
+  options    Json?
+  unit       String?  @db.VarChar(20)
+  helpText   String?  @map("help_text") @db.VarChar(300)
+  sortOrder  Int      @default(0) @map("sort_order")
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  category ValuationCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, key])
+  @@map("category_field_definitions")
+}
+
+/// Document type master. firm_id NULL = platform default.
+model DocumentType {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId        String?  @map("firm_id") @db.Uuid
+  code          String   @db.VarChar(40)
+  name          String   @db.VarChar(120)
+  defaultFolder String   @map("default_folder") @db.VarChar(40)
+  active        Boolean  @default(true)
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization? @relation(fields: [firmId], references: [id], onDelete: Restrict)
+
+  @@index([firmId, active])
+  @@map("document_types")
+}
+
+enum CaseStatus {
+  CASE_RECEIVED
+  INSPECTION_ASSIGNED
+  INSPECTION_IN_PROGRESS
+  INSPECTION_COMPLETED
+  PRELIMINARY_VALUATION_IN_PROGRESS
+  PRELIMINARY_SUBMITTED
+  FINAL_REVIEW_IN_PROGRESS
+  SENT_BACK_FOR_CORRECTION
+  FINAL_APPROVED
+  CLIENT_APPROVAL_PENDING
+  CLIENT_QUERY_RAISED
+  CLIENT_APPROVED
+  CLIENT_SIGNED
+  SUBMITTED_TO_BANK
+  LOAN_SANCTIONED
+  DISBURSED
+  CASE_COMPLETED
+  CASE_ON_HOLD
+  CASE_CANCELLED
+  CASE_REJECTED
+}
+
+enum CasePriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum AssignmentStage {
+  MARKETING
+  FIELD
+  JUNIOR
+  SENIOR
+}
+
+/// Per firm × financial year Case ID counter (row-locked upsert inside the case-creation transaction).
+model CaseCounter {
+  firmId          String   @map("firm_id") @db.Uuid
+  financialYearId String   @map("financial_year_id") @db.Uuid
+  lastValue       BigInt   @default(0) @map("last_value")
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization  Organization  @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  financialYear FinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+
+  @@id([firmId, financialYearId])
+  @@map("case_counters")
+}
+
+/// A valuation case. case_number (VAL-FIRM001-FY2627-000001) is permanent and globally unique.
+model ValuationCase {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId            String       @map("firm_id") @db.Uuid
+  caseNumber        String       @unique @map("case_number") @db.VarChar(40)
+  seq               Int
+  clientId          String       @map("client_id") @db.Uuid
+  bankId            String       @map("bank_id") @db.Uuid
+  financialYearId   String       @map("financial_year_id") @db.Uuid
+  categoryId        String       @map("category_id") @db.Uuid
+  status            CaseStatus   @default(CASE_RECEIVED)
+  holdFromStatus    CaseStatus?  @map("hold_from_status")
+  priority          CasePriority @default(NORMAL)
+  loanType          String?      @map("loan_type") @db.VarChar(80)
+  loanReference     String?      @map("loan_reference") @db.VarChar(80)
+  loanAmount        Decimal?     @map("loan_amount") @db.Decimal(18, 2)
+  propertyAddress   String?      @map("property_address") @db.VarChar(500)
+  propertyCity      String?      @map("property_city") @db.VarChar(100)
+  description       String?      @db.VarChar(1000)
+  receivedOn        DateTime     @default(now()) @map("received_on") @db.Date
+  dueDate           DateTime?    @map("due_date") @db.Date
+  statusChangedAt   DateTime     @default(now()) @map("status_changed_at") @db.Timestamptz(3)
+  isOverdue         Boolean      @default(false) @map("is_overdue")
+  awaitingDocuments Boolean      @default(false) @map("awaiting_documents")
+  closureReason     String?      @map("closure_reason") @db.VarChar(500)
+  closedAt          DateTime?    @map("closed_at") @db.Timestamptz(3)
+  rowVersion        Int          @default(0) @map("row_version")
+  createdById       String       @map("created_by_id") @db.Uuid
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization  Organization        @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  client        Client              @relation(fields: [firmId, clientId], references: [firmId, id], onDelete: Restrict)
+  bank          Bank                @relation(fields: [firmId, bankId], references: [firmId, id], onDelete: Restrict)
+  financialYear FinancialYear       @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+  category      ValuationCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  assignments   CaseAssignment[]
+  statusHistory CaseStatusHistory[]
+  activities    CaseActivity[]
+
+  @@unique([firmId, id])
+  @@index([firmId, status])
+  @@index([firmId, clientId])
+  @@index([firmId, financialYearId])
+  @@index([firmId, bankId])
+  @@index([firmId, createdAt(sort: Desc)])
+  @@map("valuation_cases")
+}
+
+/// Who works on a case at each stage. One ACTIVE assignment per stage (partial unique index in SQL).
+model CaseAssignment {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId       String          @map("firm_id") @db.Uuid
+  caseId       String          @map("case_id") @db.Uuid
+  employeeId   String          @map("employee_id") @db.Uuid
+  stage        AssignmentStage
+  assignedById String          @map("assigned_by_id") @db.Uuid
+  assignedAt   DateTime        @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  endedAt      DateTime?       @map("ended_at") @db.Timestamptz(3)
+  endReason    String?         @map("end_reason") @db.VarChar(200)
+
+  case     ValuationCase   @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+  employee EmployeeProfile @relation(fields: [firmId, employeeId], references: [firmId, id], onDelete: Restrict)
+
+  @@index([firmId, employeeId, endedAt])
+  @@index([caseId, stage])
+  @@map("case_assignments")
+}
+
+/// Status transitions (append-only). Used for TAT / SLA analytics.
+model CaseStatusHistory {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId     String      @map("firm_id") @db.Uuid
+  caseId     String      @map("case_id") @db.Uuid
+  fromStatus CaseStatus? @map("from_status")
+  toStatus   CaseStatus  @map("to_status")
+  actorId    String?     @map("actor_id") @db.Uuid
+  actorRole  String?     @map("actor_role") @db.VarChar(40)
+  remarks    String?     @db.VarChar(1000)
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  case ValuationCase @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+
+  @@index([caseId, createdAt])
+  @@map("case_status_history")
+}
+
+/// Case activity timeline (append-only): every action, with actor, role, statuses, IP and document reference.
+model CaseActivity {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId            String      @map("firm_id") @db.Uuid
+  caseId            String      @map("case_id") @db.Uuid
+  action            String      @db.VarChar(80)
+  actorId           String?     @map("actor_id") @db.Uuid
+  actorRole         String?     @map("actor_role") @db.VarChar(40)
+  prevStatus        CaseStatus? @map("prev_status")
+  newStatus         CaseStatus? @map("new_status")
+  documentVersionId String?     @map("document_version_id") @db.Uuid
+  ip                String?     @db.VarChar(64)
+  remarks           String?     @db.VarChar(1000)
+  meta              Json        @default("{}")
+  /// Shown to the client in their portal timeline.
+  clientVisible     Boolean     @default(false) @map("client_visible")
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  case ValuationCase @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+
+  @@index([caseId, createdAt])
+  @@index([firmId, createdAt(sort: Desc)])
+  @@map("case_activities")
 }

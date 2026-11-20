@@ -14,13 +14,14 @@ import { PAN_REGEX } from './clients.schema.js';
 /**
  * Client master. Tenant scope always comes from the principal.
  * Visibility: Firm Admin and Marketing (case.view.all / client.manage) see every client of the firm.
- * Field officers and reviewers see only clients of cases assigned to them — that link is added with case
- * assignments, so until then their client list is empty by design. A client sees only their own record.
+ * Field officers and reviewers see only clients of cases actively assigned to them. A client sees only their own record.
  */
 function clientScope(principal) {
   const base = { firmId: principal.firmId, deletedAt: null };
   if (hasPermission(principal, 'case.view.all') || hasPermission(principal, 'client.manage')) return base;
-  if (principal.clientId) return { ...base, id: principal.clientId };
+  if (principal.clientId && !principal.employeeId) return { ...base, id: principal.clientId };
+  // Field officers / reviewers: clients of the cases they are actively assigned to.
+  if (principal.employeeId) return { ...base, cases: { some: { assignments: { some: { employeeId: principal.employeeId, endedAt: null } } } } };
   return { ...base, id: { in: [] } };
 }
 
