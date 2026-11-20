@@ -8,7 +8,7 @@ let mk;
 let fo;
 let fo2;
 let jr;
-let sr;
+
 let bank;
 let client;
 let landCategory;
@@ -19,12 +19,11 @@ beforeAll(async () => {
   const sa = await createSuperadmin();
   A = await createFirm(sa.token, `Case Valuers ${uniq()}`);
   B = await createFirm(sa.token, `Other Valuers ${uniq()}`);
-  [mk, fo, fo2, jr, sr] = await Promise.all([
+  [mk, fo, fo2, jr] = await Promise.all([
     createEmployee(A.adminToken, ['MARKETING'], 'Meera Marketing'),
     createEmployee(A.adminToken, ['FIELD_OFFICER'], 'Farhan Field'),
     createEmployee(A.adminToken, ['FIELD_OFFICER'], 'Second Field'),
     createEmployee(A.adminToken, ['JUNIOR_REVIEWER'], 'Juhi Junior'),
-    createEmployee(A.adminToken, ['SENIOR_REVIEWER'], 'Sanjay Senior'),
   ]);
   bank = (await as(A.adminToken).post('/masters/banks', { institutionType: 'BANK', name: 'HDFC Bank', shortCode: 'HDFC', branch: 'FC Road, Pune', ifsc: 'HDFC0000123' })).body;
   client = (await as(A.adminToken).post('/clients', { clientType: 'PRIVATE_LIMITED', name: 'ABC Industries Pvt Ltd' })).body.client;
