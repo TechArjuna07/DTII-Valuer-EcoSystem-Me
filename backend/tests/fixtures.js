@@ -59,3 +59,28 @@ export async function completeInspection(fx, caseId) {
   for (const kind of ['PROPERTY', 'PROPERTY', 'LOCATION']) await uploadPhoto(fx.fo.token, caseId, kind);
   return fo.post(`/cases/${caseId}/inspection/submit`);
 }
+
+export const LB_INPUTS = {
+  land: { area: 12000, unit: 'sq.ft', ratePerUnit: 2500, guidelineRatePerUnit: 2000 },
+  building: { builtUpArea: 8000, unit: 'sq.ft', replacementRatePerUnit: 1800, ageYears: 14, totalLifeYears: 60, salvagePct: 10 },
+  amenities: [{ description: 'Compound wall', amount: 250000 }],
+};
+
+/** Junior reviewer prepares and submits the preliminary valuation (case must be INSPECTION_COMPLETED). */
+export async function completePreliminary(fx, caseId, inputs = LB_INPUTS) {
+  const jr = as(fx.jr.token);
+  await jr.post(`/cases/${caseId}/transitions`, { action: 'START_PRELIMINARY' });
+  const v = await jr.post(`/cases/${caseId}/valuations/preliminary/versions`, { inputs, summary: 'Preliminary assessment based on site inspection.' });
+  if (v.status !== 201) throw new Error(`preliminary version failed: ${JSON.stringify(v.body)}`);
+  return jr.post(`/cases/${caseId}/valuations/preliminary/submit`);
+}
+
+/** Senior reviewer approves the preliminary, issues the final report and approves it (→ FINAL_APPROVED). */
+export async function completeFinal(fx, caseId, { templateId } = {}) {
+  const sr = as(fx.sr.token);
+  await sr.post(`/cases/${caseId}/transitions`, { action: 'START_FINAL_REVIEW' });
+  await sr.post(`/cases/${caseId}/valuations/review`, { decision: 'APPROVED', comments: 'Calculations verified' });
+  const v = await sr.post(`/cases/${caseId}/valuations/final/versions`, { inputs: LB_INPUTS, summary: 'Final valuation for lending purposes.', ...(templateId ? { templateId } : {}) });
+  if (v.status !== 201) throw new Error(`final version failed: ${JSON.stringify(v.body)}`);
+  return sr.post(`/cases/${caseId}/valuations/final/approve`, { comments: 'Approved for issue' });
+}

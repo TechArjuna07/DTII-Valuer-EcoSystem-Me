@@ -1,4 +1,4 @@
-import { Archive, Building2, ClipboardCheck, CalendarRange, FileType2, FolderKanban, Layers, Landmark, LayoutDashboard, Route, ScrollText, Settings, ShieldCheck, UserRound, Users } from 'lucide-react';
+import { Archive, Building2, ClipboardCheck, FileCode2, CalendarRange, FileType2, FolderKanban, Layers, Landmark, LayoutDashboard, Route, ScrollText, Settings, ShieldCheck, UserRound, Users } from 'lucide-react';
 
 /**
  * Sidebar navigation. Items are shown by CONTEXT (platform / firm) and PERMISSION, so each role only sees
@@ -37,6 +37,7 @@ export const NAV = [
       { href: '/masters/banks', label: 'Banks & NBFCs', icon: Landmark, context: 'FIRM', any: ['master.manage'] },
       { href: '/masters/categories', label: 'Valuation Categories', icon: Layers, context: 'FIRM', any: ['master.manage'] },
       { href: '/masters/document-types', label: 'Document Types', icon: FileType2, context: 'FIRM', any: ['master.manage'] },
+      { href: '/masters/report-templates', label: 'Report Templates', icon: FileCode2, context: 'FIRM', any: ['template.manage'] },
       { href: '/masters/financial-years', label: 'Financial Years', icon: CalendarRange, context: 'FIRM', any: ['master.manage'] },
     ],
   },

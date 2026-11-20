@@ -97,6 +97,7 @@ model Organization {
   documentTypes       DocumentType[]
   cases               ValuationCase[]
   caseCounters        CaseCounter[]
+  reportTemplates     ReportTemplate[]
 
   @@index([status])
   @@map("organizations")
@@ -620,6 +621,7 @@ model ValuationCase {
   docRequests   DocumentRequest[]
   property      PropertyDetails?
   inspections   PropertyInspection[]
+  reports       ValuationReport[]
 
   @@unique([firmId, id])
   @@index([firmId, status])
@@ -909,4 +911,133 @@ model InspectionPhoto {
 
   @@index([inspectionId])
   @@map("inspection_photos")
+}
+
+// ───────────────────────────── Phase 7: valuation reports & templates ─────────────────────────────
+
+enum ReportStage {
+  PRELIMINARY
+  FINAL
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  RETURNED
+  REJECTED
+}
+
+enum ReviewDecision {
+  APPROVED
+  RETURNED
+  REJECTED
+}
+
+/// One preliminary and one final report per case; content lives in immutable versions.
+model ValuationReport {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId           String       @map("firm_id") @db.Uuid
+  caseId           String       @map("case_id") @db.Uuid
+  stage            ReportStage
+  status           ReportStatus @default(DRAFT)
+  engine           String       @db.VarChar(40)
+  currentVersionId String?      @map("current_version_id") @db.Uuid
+  versionCount     Int          @default(0) @map("version_count")
+  templateId       String?      @map("template_id") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  case     ValuationCase            @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+  versions ValuationReportVersion[]
+
+  @@unique([firmId, id])
+  @@unique([caseId, stage])
+  @@map("valuation_reports")
+}
+
+/// Immutable report version: inputs, server-computed calculation, values and the rendered / uploaded PDF.
+model ValuationReportVersion {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId            String   @map("firm_id") @db.Uuid
+  reportId          String   @map("report_id") @db.Uuid
+  version           Int
+  inputs            Json
+  calculation       Json
+  marketValue       Decimal  @map("market_value") @db.Decimal(18, 2)
+  realisableValue   Decimal  @map("realisable_value") @db.Decimal(18, 2)
+  distressValue     Decimal  @map("distress_value") @db.Decimal(18, 2)
+  guidelineValue    Decimal? @map("guideline_value") @db.Decimal(18, 2)
+  insurableValue    Decimal? @map("insurable_value") @db.Decimal(18, 2)
+  summary           String?  @db.VarChar(5000)
+  changeNote        String?  @map("change_note") @db.VarChar(1000)
+  documentId        String?  @map("document_id") @db.Uuid
+  documentVersionId String?  @map("document_version_id") @db.Uuid
+  templateVersionId String?  @map("template_version_id") @db.Uuid
+  /// Public verification code printed (with a QR code) on final reports.
+  verificationCode  String?  @unique @map("verification_code") @db.VarChar(40)
+  preparedById      String   @map("prepared_by_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  report  ValuationReport @relation(fields: [firmId, reportId], references: [firmId, id], onDelete: Restrict)
+  reviews ReportReview[]
+
+  @@unique([firmId, id])
+  @@unique([reportId, version])
+  @@map("valuation_report_versions")
+}
+
+/// Senior reviewer decision on a preliminary version (append-only).
+model ReportReview {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId          String         @map("firm_id") @db.Uuid
+  reportVersionId String         @map("report_version_id") @db.Uuid
+  reviewerId      String         @map("reviewer_id") @db.Uuid
+  decision        ReviewDecision
+  comments        String?        @db.VarChar(3000)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  version ValuationReportVersion @relation(fields: [firmId, reportVersionId], references: [firmId, id], onDelete: Restrict)
+
+  @@index([reportVersionId])
+  @@map("report_reviews")
+}
+
+/// Bank / NBFC-specific report format (Handlebars HTML). bank_id / category_id NULL = applies to all.
+model ReportTemplate {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId           String       @map("firm_id") @db.Uuid
+  name             String       @db.VarChar(150)
+  description      String?      @db.VarChar(500)
+  bankId           String?      @map("bank_id") @db.Uuid
+  categoryId       String?      @map("category_id") @db.Uuid
+  status           RecordStatus @default(ACTIVE)
+  currentVersionId String?      @map("current_version_id") @db.Uuid
+  versionCount     Int          @default(0) @map("version_count")
+  createdById      String       @map("created_by_id") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization            @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  versions     ReportTemplateVersion[]
+
+  @@unique([firmId, id])
+  @@index([firmId, bankId, categoryId])
+  @@map("report_templates")
+}
+
+model ReportTemplateVersion {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId      String   @map("firm_id") @db.Uuid
+  templateId  String   @map("template_id") @db.Uuid
+  version     Int
+  bodyHtml    String   @map("body_html")
+  changeNote  String?  @map("change_note") @db.VarChar(500)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  template ReportTemplate @relation(fields: [firmId, templateId], references: [firmId, id], onDelete: Restrict)
+
+  @@unique([templateId, version])
+  @@map("report_template_versions")
 }

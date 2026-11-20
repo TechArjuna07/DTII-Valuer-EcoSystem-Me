@@ -53,6 +53,7 @@ export const router = createBrowserRouter([
         element: <AuthLayout />,
         children: [
           { path: '/status', element: L(() => import('@/pages/system/SystemStatusPage')) },
+          { path: '/verify/:code', element: L(() => import('@/pages/system/VerifyReportPage')) },
           {
             element: <RedirectIfAuthenticated />,
             children: [
@@ -123,6 +124,7 @@ export const router = createBrowserRouter([
                   { path: '/masters/financial-years', element: L(() => import('@/pages/masters/FinancialYearsPage')) },
                 ],
               },
+              { element: <RequireAuth context="FIRM" permissions={['template.manage']} />, children: [{ path: '/masters/report-templates', element: L(() => import('@/pages/masters/ReportTemplatesPage')) }] },
               { element: <RequireAuth context="FIRM" permissions={['workflow.config.manage']} />, children: [{ path: '/masters/workflow', element: L(() => import('@/pages/masters/WorkflowSettingsPage')) }] },
               { element: <RequireAuth context="FIRM" permissions={['rbac.manage']} />, children: [{ path: '/roles-permissions', element: L(() => import('@/pages/admin/RolesPermissionsPage')) }] },
               { element: <RequireAuth context="FIRM" permissions={['audit.view']} />, children: [{ path: '/audit-logs', element: L(() => import('@/pages/admin/FirmAuditPage')) }] },

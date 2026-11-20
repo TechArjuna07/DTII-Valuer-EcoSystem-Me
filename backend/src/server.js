@@ -3,6 +3,7 @@ import { logger } from './config/logger.js';
 import { prisma } from './database/prisma.js';
 import { redis } from './database/redis.js';
 import { createApp } from './app.js';
+import { closeRenderer } from './services/pdf/pdf-renderer.js';
 
 /** HTTP entry point. Background workers are added in the notifications phase (RUN_MODE=worker|all). */
 async function main() {
@@ -17,6 +18,7 @@ async function main() {
     shuttingDown = true;
     logger.info({ signal }, 'Shutting down gracefully');
     server.close();
+    await closeRenderer();
     await prisma.$disconnect().catch(() => undefined);
     await redis.quit().catch(() => undefined);
     process.exit(0);

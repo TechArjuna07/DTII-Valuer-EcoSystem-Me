@@ -1,6 +1,7 @@
 import { redis } from '../../src/database/redis.js';
 import { as, createEmployee, prisma } from '../helpers.js';
-import { completeInspection, createCaseWithTeam, LAND_PROPERTY, setupFirm, uploadPhoto } from '../fixtures.js';
+import { closeRenderer } from '../../src/services/pdf/pdf-renderer.js';
+import { completeInspection, completePreliminary, createCaseWithTeam, LAND_PROPERTY, setupFirm, uploadPhoto } from '../fixtures.js';
 
 let fx;
 let otherFo;
@@ -11,6 +12,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await closeRenderer();
   await prisma.$disconnect();
   await redis.quit();
 });
@@ -83,9 +85,8 @@ describe('inspection workflow', () => {
   test('a re-inspection requested by the senior reviewer opens a new round and keeps the old one', async () => {
     const c = await createCaseWithTeam(fx);
     await completeInspection(fx, c.id);
-    // push the case to senior review via the generic transitions available at this point
-    await as(fx.jr.token).post(`/cases/${c.id}/transitions`, { action: 'START_PRELIMINARY' });
-    await prisma.valuationCase.update({ where: { id: c.id }, data: { status: 'FINAL_REVIEW_IN_PROGRESS' } });
+    await completePreliminary(fx, c.id);
+    await as(fx.sr.token).post(`/cases/${c.id}/transitions`, { action: 'START_FINAL_REVIEW' });
     const re = await as(fx.sr.token).post(`/cases/${c.id}/transitions`, { action: 'REQUEST_REINSPECTION', remarks: 'Rear structure not photographed' });
     expect(re.body.status).toBe('INSPECTION_IN_PROGRESS');
     const draft = await as(fx.fo.token).put(`/cases/${c.id}/inspection`, { officerRemarks: 'Rear structure covered' });
@@ -93,5 +94,5 @@ describe('inspection workflow', () => {
     expect(draft.body.current.condition).toBe('GOOD'); // carried over
     expect(draft.body.current.photos).toHaveLength(0);
     expect(draft.body.previousRounds).toHaveLength(1);
-  });
+  }, 60_000);
 });

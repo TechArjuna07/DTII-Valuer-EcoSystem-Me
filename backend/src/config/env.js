@@ -56,6 +56,9 @@ const schema = z
     M365_CLIENT_SECRET: z.string().optional(),
     M365_SENDER: z.string().optional(),
 
+    PDF_RENDERER: z.enum(['chrome', 'none']).default('chrome'),
+    CHROME_PATH: z.string().optional(),
+
     SCANNER: z.enum(['none', 'clamav']).default('none'),
     CLAMAV_HOST: z.string().default('127.0.0.1'),
     CLAMAV_PORT: z.coerce.number().int().default(3310),
