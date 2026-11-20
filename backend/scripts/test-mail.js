@@ -20,7 +20,7 @@ if (process.env.MAIL_PROVIDER === 'office365') {
   const res = await fetch(`https://login.microsoftonline.com/${encodeURIComponent(e.M365_TENANT_ID?.trim())}/oauth2/v2.0/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: e.M365_CLIENT_ID?.trim() ?? '', client_secret: e.M365_CLIENT_SECRET?.trim() ?? '', scope: 'https://outlook.office365.com/.default' }),
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: e.M365_CLIENT_ID?.trim() ?? '', client_secret: e.M365_CLIENT_SECRET?.trim() ?? '', scope: e.M365_TRANSPORT === 'smtp' ? 'https://outlook.office365.com/.default' : 'https://graph.microsoft.com/.default' }),
   });
   const j = await res.json();
   if (!res.ok) {

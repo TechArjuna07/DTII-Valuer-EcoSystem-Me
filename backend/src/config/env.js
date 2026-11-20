@@ -55,6 +55,8 @@ const schema = z
     M365_CLIENT_ID: z.string().optional(),
     M365_CLIENT_SECRET: z.string().optional(),
     M365_SENDER: z.string().optional(),
+    /** graph = Microsoft Graph sendMail (Mail.Send app permission); smtp = SMTP XOAUTH2 (needs SMTP AUTH enabled). */
+    M365_TRANSPORT: z.enum(['graph', 'smtp']).default('graph'),
 
     SIGNATURE_PROVIDER: z.enum(['sandbox', 'dtii-signer']).default('sandbox'),
     SIGNER_BASE_URL: z.string().url().optional(),
