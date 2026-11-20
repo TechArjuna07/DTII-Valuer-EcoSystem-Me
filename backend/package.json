@@ -23,7 +23,8 @@
     "start:worker": "node src/worker.js",
     "dev:worker": "node --watch src/worker.js",
     "db:reset-dev": "node scripts/reset-dev-data.js",
-    "mail:test": "node scripts/test-mail.js"
+    "mail:test": "node scripts/test-mail.js",
+    "cases:complete-disbursed": "node scripts/complete-disbursed-cases.js"
   },
   "prisma": {
     "seed": "node prisma/seed/index.js"

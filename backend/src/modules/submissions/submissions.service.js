@@ -127,7 +127,20 @@ async function recordSanction(principal, caseId, body, file, req) {
   return getBankAndLoan(principal, caseId);
 }
 
-/** Records a disbursement tranche; the cumulative amount may not exceed the sanction; the final tranche → DISBURSED. */
+/**
+ * Moves a sanctioned case whose loan is fully disbursed to DISBURSED and then CASE_COMPLETED (both automatic,
+ * recorded as SYSTEM steps). Call inside the transaction, on a LOCKED case in LOAN_SANCTIONED.
+ */
+async function completeDisbursement(tx, principal, c, { tranche, total, req, system = false }) {
+  const disbursed = await transition(tx, principal, c, 'RECORD_FINAL_DISBURSEMENT', { req, system, meta: { tranche, total, ...(system ? { automatic: true } : {}) } });
+  const closed = await transition(tx, principal, disbursed.case, 'CLOSE_CASE', { system: true, remarks: 'Loan fully disbursed', req, meta: { automatic: true } });
+  return [...disbursed.events, ...closed.events];
+}
+
+/**
+ * Records a disbursement tranche; the cumulative amount may not exceed the sanction. The tranche marked final, or
+ * the one that brings the total to the sanctioned amount, completes the case (DISBURSED → CASE_COMPLETED).
+ */
 async function recordDisbursement(principal, caseId, body, file, req) {
   await findVisibleCase(principal, caseId);
   await assertActor(principal, caseId, 'loan.update');
@@ -139,14 +152,15 @@ async function recordDisbursement(principal, caseId, body, file, req) {
       const sanction = await tx.loanSanction.findUnique({ where: { caseId } });
       const previous = await tx.loanDisbursement.findMany({ where: { caseId } });
       const total = previous.reduce((s, d) => s + Number(d.amount), 0) + body.amount;
+      const isFinal = !!body.isFinal || total >= Number(sanction.amount) - 0.001;
       if (total > Number(sanction.amount) + 0.001) throw BadRequest(`Total disbursed (₹${total.toLocaleString('en-IN')}) would exceed the sanctioned amount (₹${Number(sanction.amount).toLocaleString('en-IN')})`);
       if (body.disbursedOn < sanction.sanctionDate) throw BadRequest('The disbursement date cannot be before the sanction date');
       const stored = proof ? await storeVersion({ principal, c, folder: 'DISBURSEMENT_DOCUMENTS', content: proof, title: `Disbursement ${previous.length + 1} confirmation`, req, tx }) : null;
       await tx.loanDisbursement.create({
-        data: { firmId: c.firmId, caseId, trancheNo: previous.length + 1, amount: body.amount, disbursedOn: body.disbursedOn, referenceNo: body.referenceNo ?? null, proofDocumentId: stored?.document.id ?? null, isFinal: !!body.isFinal, remarks: body.remarks ?? null, recordedById: principal.userId },
+        data: { firmId: c.firmId, caseId, trancheNo: previous.length + 1, amount: body.amount, disbursedOn: body.disbursedOn, referenceNo: body.referenceNo ?? null, proofDocumentId: stored?.document.id ?? null, isFinal, remarks: body.remarks ?? null, recordedById: principal.userId },
       });
       const out = [...(stored?.events ?? [])];
-      if (body.isFinal) out.push(...(await transition(tx, principal, c, 'RECORD_FINAL_DISBURSEMENT', { req, meta: { tranche: previous.length + 1, total } })).events);
+      if (isFinal) out.push(...(await completeDisbursement(tx, principal, c, { tranche: previous.length + 1, total, req })));
       else await recordActivity(tx, { c, principal, action: 'DISBURSEMENT_RECORDED', meta: { tranche: previous.length + 1, amount: body.amount }, req, clientVisible: true });
       return out;
     },
@@ -156,4 +170,4 @@ async function recordDisbursement(principal, caseId, body, file, req) {
   return getBankAndLoan(principal, caseId);
 }
 
-export { getBankAndLoan, submit, recordSanction, recordDisbursement };
+export { getBankAndLoan, submit, recordSanction, recordDisbursement, completeDisbursement };

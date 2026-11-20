@@ -32,7 +32,7 @@ function useBankAction(c) {
       qc.setQueryData(['bank', c.id], res);
       qc.invalidateQueries({ queryKey: ['cases', 'detail', c.id] });
       qc.invalidateQueries({ queryKey: ['documents', c.id] });
-      toast.success(v.msg);
+      toast.success(res.caseStatus === 'CASE_COMPLETED' && v.path === 'disbursements' ? 'Loan fully disbursed: case completed' : v.msg);
     },
     onError: (e) => toast.error(e.details?.join(' · ') ?? e.message),
   });
@@ -247,14 +247,14 @@ export function SanctionDisbursementTab({ c }) {
               <Input id="d-ref" value={d.referenceNo} onChange={(e) => setD({ ...d, referenceNo: e.target.value })} />
             </div>
             <label className="flex items-end gap-2 pb-2 text-sm">
-              <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={d.isFinal} onChange={(e) => setD({ ...d, isFinal: e.target.checked })} /> Final tranche
+              <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={d.isFinal} onChange={(e) => setD({ ...d, isFinal: e.target.checked })} /> Final tranche (automatic when the full sanctioned amount is disbursed; the case is then completed)
             </label>
             <div className="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-4">
               <FilePick file={dFile} setFile={setDFile} label="Attach confirmation" />
               <Button
                 disabled={!(Number(d.amount) > 0)}
                 loading={act.isPending}
-                onClick={() => act.mutate({ path: 'disbursements', fields: d, file: dFile, msg: d.isFinal ? 'Final disbursement recorded' : 'Tranche recorded' }, { onSuccess: () => (setDFile(null), setD({ ...d, amount: '', referenceNo: '' })) })}
+                onClick={() => act.mutate({ path: 'disbursements', fields: d, file: dFile, msg: 'Disbursement recorded' }, { onSuccess: () => (setDFile(null), setD({ ...d, amount: '', referenceNo: '' })) })}
               >
                 Record tranche
               </Button>

@@ -50,12 +50,12 @@ describe('end-to-end case lifecycle', () => {
     const t1 = await post(fx.mk.token, `/cases/${c.id}/bank/disbursements`, { amount: 4000000, disbursedOn: today(), referenceNo: 'UTR1', isFinal: 'false' });
     expect(t1.body.totals).toMatchObject({ sanctioned: 6000000, disbursed: 4000000, remaining: 2000000 });
     expect((await post(fx.mk.token, `/cases/${c.id}/bank/disbursements`, { amount: 2500000, disbursedOn: today(), isFinal: 'true' })).status).toBe(400);
-    const t2 = await post(fx.mk.token, `/cases/${c.id}/bank/disbursements`, { amount: 2000000, disbursedOn: today(), referenceNo: 'UTR2', isFinal: 'true' }, PDF);
-    expect(t2.body.caseStatus).toBe('DISBURSED');
-    expect(t2.body.disbursements.map((d) => d.trancheNo)).toEqual([1, 2]);
-
-    const closed = await as(fx.mk.token).post(`/cases/${c.id}/transitions`, { action: 'CLOSE_CASE', remarks: 'Loan fully disbursed' });
-    expect(closed.body.status).toBe('CASE_COMPLETED');
+    // The tranche that reaches the sanctioned amount is final even when not ticked: DISBURSED → CASE_COMPLETED automatically.
+    const t2 = await post(fx.mk.token, `/cases/${c.id}/bank/disbursements`, { amount: 2000000, disbursedOn: today(), referenceNo: 'UTR2', isFinal: 'false' }, PDF);
+    expect(t2.body.caseStatus).toBe('CASE_COMPLETED');
+    expect(t2.body.disbursements.map((d) => [d.trancheNo, d.isFinal])).toEqual([[1, false], [2, true]]);
+    const closedBy = (await as(fx.admin).get(`/cases/${c.id}/timeline`)).body.items.find((i) => i.action === 'CLOSE_CASE');
+    expect(closedBy).toMatchObject({ actorRole: 'SYSTEM', remarks: 'Loan fully disbursed' });
 
     // Complete status trail, timeline and repository.
     const history = (await prisma.caseStatusHistory.findMany({ where: { caseId: c.id }, orderBy: { createdAt: 'asc' } })).map((h) => h.toStatus);
