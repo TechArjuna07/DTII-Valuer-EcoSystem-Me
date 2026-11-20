@@ -106,11 +106,40 @@ infra/      redis/ (docker compose), postgres/ (role & database bootstrap script
 docs/       Architecture, API, database, security and deployment documentation
 ```
 
+## Running the background worker
+
+`RUN_MODE=all` (the default in `backend/.env`) runs the BullMQ workers (email, malware scan, SLA sweep, signature
+polling) inside the API process. In production run them separately:
+
+```powershell
+pnpm --filter @valuers/backend start:worker     # RUN_MODE=worker
+```
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/PHASE_1_ARCHITECTURE_AND_PLAN.md](docs/PHASE_1_ARCHITECTURE_AND_PLAN.md) | Architecture, ER diagrams, RBAC matrix, workflow, decisions |
+| [docs/API.md](docs/API.md) | API overview (full reference: Swagger at `/api/docs`) |
+| [docs/DATABASE.md](docs/DATABASE.md) | Tables, roles, database-enforced integrity rules |
+| [docs/VAPT_CHECKLIST.md](docs/VAPT_CHECKLIST.md) | Security controls mapped to automated tests, residual risks |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment (S3, PostgreSQL, Redis, nginx, PM2, email, go-live checklist) |
+
+Load test (against a running API): `LOAD_EMAIL=… LOAD_PASSWORD=… node backend/scripts/load-test.js --create 50`.
+Mobile camera / GPS testing over HTTPS: `pnpm --filter @valuers/frontend dev:https`.
+
 ## Development status
 
 | Phase | Status |
 |---|---|
-| 1. Inspection & design | ✅ Done |
-| 2. Project setup | ✅ Done: workspace, PostgreSQL roles and migration, Redis container, API skeleton, design system, tests |
-| 3. Authentication & multi-tenancy | ✅ Done: login, refresh rotation, lockout, invite/reset, devices, firm registration, employees, clients, RBAC matrix, audit trail |
-| 4–11 | Planned (see the Phase 1 document, §7) |
+| 1. Inspection & design | ✅ |
+| 2. Project setup | ✅ |
+| 3. Authentication & multi-tenancy | ✅ |
+| 4. Case management (Case IDs, masters, workflow, assignments) | ✅ |
+| 5. Document repository (versions, folder ACL, signed links, requests) | ✅ |
+| 6. Inspection workflow (mobile, GPS with consent, photos) | ✅ |
+| 7. Valuation workflow (engines, reviews, bank templates, PDF, verification QR) | ✅ |
+| 8. Client approval & digital signatures | ✅ |
+| 9. Bank submission, sanction & disbursement | ✅ |
+| 10. Notifications, email queue, dashboards & reports | ✅ |
+| 11. Security & production readiness | ✅ (see the residual risks in the VAPT checklist) |

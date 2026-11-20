@@ -37,10 +37,10 @@ async function getBuffer(key) {
 }
 
 /** Pre-signed GET with forced Content-Type / Content-Disposition. */
-function presignGet(key, { contentType, contentDisposition, expiresIn }) {
+function presignGet(key, { contentType, contentDisposition, expiresIn, bucket = env.S3_BUCKET }) {
   return getSignedUrl(
     s3(),
-    new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: fullKey(key), ResponseContentType: contentType, ResponseContentDisposition: contentDisposition }),
+    new GetObjectCommand({ Bucket: bucket, Key: fullKey(key), ResponseContentType: contentType, ResponseContentDisposition: contentDisposition }),
     { expiresIn },
   );
 }
