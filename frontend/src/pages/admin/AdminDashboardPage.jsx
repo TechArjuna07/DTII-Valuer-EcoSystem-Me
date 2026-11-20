@@ -9,7 +9,7 @@ import { StatCard } from '@/components/data/StatCard';
 import { EmptyState, ErrorState } from '@/components/data/States';
 import { formatDate, humanize } from '@/utils/format';
 
-/** Firm Admin dashboard. Case pipeline tiles (new, inspection, review, bank, sanction…) are added with case management. */
+/** Firm Admin team overview: employees by role, pending invitations and recent clients (case analytics live on /dashboard). */
 export default function AdminDashboardPage() {
   const { me } = useAuth();
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['firm', 'summary'], queryFn: firmApi.summary });
@@ -18,7 +18,7 @@ export default function AdminDashboardPage() {
   return (
     <>
       <PageHeader
-        title={`Welcome, ${me.user.fullName.split(' ')[0]}`}
+        title="Team overview"
         description={`${me.context.firm.name} · ${me.context.firm.firmCode}`}
         actions={
           <>

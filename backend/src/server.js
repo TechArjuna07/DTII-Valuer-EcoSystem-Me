@@ -4,13 +4,16 @@ import { prisma } from './database/prisma.js';
 import { redis } from './database/redis.js';
 import { createApp } from './app.js';
 import { closeRenderer } from './services/pdf/pdf-renderer.js';
+import { closeQueues } from './jobs/queues.js';
+import { startWorkers } from './jobs/index.js';
 
-/** HTTP entry point. Background workers are added in the notifications phase (RUN_MODE=worker|all). */
+/** HTTP entry point. RUN_MODE=api serves HTTP only; RUN_MODE=all also runs the background workers (local / single node). */
 async function main() {
   const app = createApp();
   const server = app.listen(env.PORT, () => logger.info(`API listening on http://localhost:${env.PORT} (run mode: ${env.RUN_MODE})`));
   server.keepAliveTimeout = 65_000; // longer than typical load-balancer idle timeouts
   server.headersTimeout = 66_000;
+  const stopWorkers = env.RUN_MODE === 'all' ? await startWorkers() : async () => undefined;
 
   let shuttingDown = false;
   const shutdown = async (signal) => {
@@ -18,6 +21,8 @@ async function main() {
     shuttingDown = true;
     logger.info({ signal }, 'Shutting down gracefully');
     server.close();
+    await stopWorkers().catch(() => undefined);
+    await closeQueues();
     await closeRenderer();
     await prisma.$disconnect().catch(() => undefined);
     await redis.quit().catch(() => undefined);

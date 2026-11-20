@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/primitives';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/overlays';
 import { Logo } from './Logo';
 import { NAV } from './navConfig';
+import { NotificationBell } from './NotificationBell';
 
 function visibleNav(me) {
   const perms = me.context.permissions;
@@ -116,6 +117,7 @@ export default function AppShell() {
             <p className="truncate text-xs text-muted-foreground">{roleLabel}</p>
           </div>
           <div className="ml-auto flex items-center gap-1">
+            {me.context.type === 'FIRM' && <NotificationBell />}
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg p-1.5 pr-2 hover:bg-accent" aria-label="Account menu">
                 <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">{initials(me.user.fullName)}</span>

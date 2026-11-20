@@ -50,7 +50,7 @@ const fieldBody = z.strictObject({
 const docTypeBody = z.strictObject({ code, name: str(120).min(2), defaultFolder: z.enum(FOLDER_CODES), sortOrder: z.number().int().min(0).max(999).optional() });
 const docTypeUpdate = z.strictObject({ name: str(120).min(2).optional(), defaultFolder: z.enum(FOLDER_CODES).optional(), active: z.boolean().optional() });
 const workflowBody = z.strictObject({
-  slaHours: z.record(z.enum(ALL_STATUSES), z.number().int().min(0).max(24 * 90)).optional(),
+  slaHours: z.partialRecord(z.enum(ALL_STATUSES), z.number().int().min(0).max(24 * 90)).optional(),
   options: z.strictObject({ autoAssign: z.enum(['MANUAL', 'LEAST_LOADED']), requireSourceDocument: z.boolean(), minInspectionPhotos: z.number().int().min(0).max(50) }).optional(),
 });
 const inactive = z.strictObject({ includeInactive: z.enum(['true', 'false']).optional() });

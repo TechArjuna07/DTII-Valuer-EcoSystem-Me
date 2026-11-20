@@ -8,6 +8,7 @@ import { hasPermission } from '../../middleware/authorize.js';
 import { recordAudit } from '../../services/audit.service.js';
 import { emit } from '../../services/events.js';
 import { scanBuffer, DOWNLOADABLE } from '../../services/scanner.service.js';
+import { enqueue } from '../../jobs/queues.js';
 import * as storage from '../../services/storage/storage.service.js';
 import { caseScope, findVisibleCase } from '../cases/case-access.js';
 import { recordActivity } from '../workflow/workflow.service.js';
@@ -138,7 +139,7 @@ async function storeVersion({ principal, c, folder, content, title, documentType
     return { document: doc, version: v, events: [['document.uploaded', { firmId: c.firmId, caseId: c.id, documentId: doc.id, versionId: v.id, folder, actorId: principal?.userId ?? null, fulfilledRequestId: fulfilled?.id ?? null }]] };
   };
   const result = outerTx ? await run(outerTx) : await prisma.$transaction(run);
-  if (env.SCANNER !== 'none') setImmediate(() => scanVersion(result.version.id, content.buffer));
+  if (env.SCANNER !== 'none') await enqueue('scan', 'scan', { versionId: result.version.id }, { jobId: `scan__${result.version.id}` });
   return result;
 }
 

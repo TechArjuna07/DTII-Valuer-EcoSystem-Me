@@ -1213,3 +1213,52 @@ model LoanDisbursement {
   @@unique([caseId, trancheNo])
   @@map("loan_disbursements")
 }
+
+// ───────────────────────────── Phase 10: notifications & email ─────────────────────────────
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// In-app notification (deduplicated per event / recipient).
+model Notification {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId      String?   @map("firm_id") @db.Uuid
+  recipientId String    @map("recipient_id") @db.Uuid
+  event       String    @db.VarChar(60)
+  caseId      String?   @map("case_id") @db.Uuid
+  title       String    @db.VarChar(200)
+  body        String    @db.VarChar(1000)
+  link        String?   @db.VarChar(300)
+  readAt      DateTime? @map("read_at") @db.Timestamptz(3)
+  dedupeKey   String    @unique @map("dedupe_key") @db.VarChar(200)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([recipientId, readAt, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+/// Outbound email delivery log. Recipient addresses are stored masked + hashed (no full PII in logs).
+model EmailLog {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId            String?     @map("firm_id") @db.Uuid
+  notificationId    String?     @map("notification_id") @db.Uuid
+  toMasked          String      @map("to_masked") @db.VarChar(120)
+  toHash            String      @map("to_hash") @db.VarChar(64)
+  template          String      @db.VarChar(60)
+  subject           String      @db.VarChar(250)
+  provider          String?     @db.VarChar(20)
+  status            EmailStatus @default(QUEUED)
+  attempts          Int         @default(0)
+  providerMessageId String?     @map("provider_message_id") @db.VarChar(250)
+  error             String?     @db.VarChar(500)
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  sentAt            DateTime?   @map("sent_at") @db.Timestamptz(3)
+
+  @@index([firmId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("email_logs")
+}

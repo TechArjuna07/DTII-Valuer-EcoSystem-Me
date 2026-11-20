@@ -74,6 +74,15 @@ export const router = createBrowserRouter([
             element: <AppShell />,
             children: [
               { path: '/account', element: L(() => import('@/pages/account/AccountPage')) },
+              { path: '/notifications', element: L(() => import('@/pages/account/NotificationsPage')) },
+              {
+                element: <RequireAuth context="FIRM" permissions={['reports.view']} />,
+                children: [
+                  { path: '/dashboard', element: L(() => import('@/pages/dashboard/DashboardPage')) },
+                  { path: '/reports', element: L(() => import('@/pages/reports/ReportsPage')) },
+                ],
+              },
+              { element: <RequireAuth context="FIRM" permissions={['firm.smtp.manage']} />, children: [{ path: '/email-settings', element: L(() => import('@/pages/admin/EmailSettingsPage')) }] },
 
               // Superadmin (platform context)
               {
@@ -91,7 +100,7 @@ export const router = createBrowserRouter([
               {
                 element: <RequireAuth context="FIRM" permissions={['employee.manage']} />,
                 children: [
-                  { path: '/dashboard', element: L(() => import('@/pages/admin/AdminDashboardPage')) },
+                  { path: '/team', element: L(() => import('@/pages/admin/AdminDashboardPage')) },
                   { path: '/employees', element: L(() => import('@/pages/admin/employees/EmployeesListPage')) },
                   { path: '/employees/new', element: L(() => import('@/pages/admin/employees/EmployeeNewPage')) },
                   { path: '/employees/:id', element: L(() => import('@/pages/admin/employees/EmployeeDetailPage')) },

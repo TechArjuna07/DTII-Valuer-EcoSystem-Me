@@ -50,3 +50,14 @@ function passwordResetEmail({ fullName, url, expiresMinutes }) {
 }
 
 export { inviteEmail, passwordResetEmail, esc };
+
+/** Generic workflow notification email, branded with the firm name. */
+function notificationEmail({ firmName, fullName, title, body, url }) {
+  return {
+    subject: `${title}${firmName ? ` · ${firmName}` : ''}`,
+    text: `Hello ${fullName},\n\n${body}\n${url ? `\nOpen: ${url}\n` : ''}`,
+    html: layout({ title, firmName, bodyHtml: `<p>Hello ${esc(fullName)},</p><p>${esc(body)}</p>`, actionUrl: url, actionLabel: 'Open in Valuers Ecosystem', footer: 'You receive this email because of your role on this case.' }),
+  };
+}
+
+export { notificationEmail };

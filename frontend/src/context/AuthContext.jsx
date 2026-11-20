@@ -10,13 +10,13 @@ import * as authApi from '@/services/authApi';
  */
 const AuthContext = createContext(null);
 
-/** Landing page per context. Role dashboards are added as their modules are built. */
+/** Landing page per context: platform dashboard, field officer inspections, role dashboard, or client portal. */
 export function homeFor(me) {
   if (!me) return '/login';
   if (me.context.type === 'PLATFORM') return '/platform';
   const perms = me.context.permissions;
-  if (perms.includes('employee.manage')) return '/dashboard';
-  if (perms.includes('inspection.perform')) return '/inspections';
+  if (perms.includes('inspection.perform') && !perms.includes('employee.manage')) return '/inspections';
+  if (perms.includes('reports.view')) return '/dashboard';
   if (perms.includes('portal.access')) return '/portal';
   if (perms.includes('case.view') || perms.includes('portal.access')) return '/cases';
   return '/account';

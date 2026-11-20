@@ -11,6 +11,7 @@ import { limiters } from './middleware/rate-limit.js';
 import { errorHandler, notFound } from './middleware/error-handler.js';
 import { v1 } from './routes.js';
 import { buildOpenApi } from './docs/openapi.js';
+import { registerNotificationRules } from './modules/notifications/rules.js';
 
 const API_PREFIX = '/api/v1';
 const DOCS_PATH = '/api/docs';
@@ -23,6 +24,7 @@ BigInt.prototype.toJSON = function toJSON() {
 
 /** Builds the Express application (used by server.js and the integration tests). */
 function createApp() {
+  registerNotificationRules();
   const app = express();
   app.disable('x-powered-by');
   app.set('etag', false); // never 304 sensitive JSON

@@ -1,4 +1,4 @@
-import { Archive, Building2, ClipboardCheck, FileCode2, CalendarRange, FileType2, FolderKanban, Layers, Landmark, LayoutDashboard, Route, ScrollText, Settings, ShieldCheck, UserRound, Users } from 'lucide-react';
+import { Archive, BarChart3, Building2, ClipboardCheck, FileCode2, Mail, CalendarRange, FileType2, FolderKanban, Layers, Landmark, LayoutDashboard, Route, ScrollText, Settings, ShieldCheck, UserRound, Users } from 'lucide-react';
 
 /**
  * Sidebar navigation. Items are shown by CONTEXT (platform / firm) and PERMISSION, so each role only sees
@@ -11,7 +11,8 @@ export const NAV = [
     section: 'Overview',
     items: [
       { href: '/platform', label: 'Platform Dashboard', icon: LayoutDashboard, context: 'PLATFORM', any: ['platform.dashboard.view'], exact: true },
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, context: 'FIRM', any: ['employee.manage'] },
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, context: 'FIRM', any: ['reports.view'] },
+      { href: '/team', label: 'Team Overview', icon: Users, context: 'FIRM', any: ['employee.manage'] },
       { href: '/portal', label: 'My Dashboard', icon: LayoutDashboard, context: 'FIRM', any: ['portal.access'] },
     ],
   },
@@ -27,6 +28,7 @@ export const NAV = [
     items: [
       { href: '/inspections', label: 'My Inspections', icon: ClipboardCheck, context: 'FIRM', any: ['inspection.perform'] },
       { href: '/cases', label: 'Cases', icon: FolderKanban, context: 'FIRM', any: ['case.view', 'portal.access'] },
+      { href: '/reports', label: 'Reports', icon: BarChart3, context: 'FIRM', any: ['reports.view'] },
       { href: '/repository', label: 'Document Repository', icon: Archive, context: 'FIRM', any: ['client.view', 'portal.access'] },
     ],
   },
@@ -48,6 +50,7 @@ export const NAV = [
       { href: '/masters/workflow', label: 'Workflow Settings', icon: Route, context: 'FIRM', any: ['workflow.config.manage'] },
       { href: '/roles-permissions', label: 'Roles & Permissions', icon: ShieldCheck, context: 'FIRM', any: ['rbac.manage'] },
       { href: '/audit-logs', label: 'Audit Trail', icon: ScrollText, context: 'FIRM', any: ['audit.view'] },
+      { href: '/email-settings', label: 'Email Settings', icon: Mail, context: 'FIRM', any: ['firm.smtp.manage'] },
       { href: '/firm-profile', label: 'Firm Profile', icon: Settings, context: 'FIRM', any: ['firm.settings.manage'] },
     ],
   },

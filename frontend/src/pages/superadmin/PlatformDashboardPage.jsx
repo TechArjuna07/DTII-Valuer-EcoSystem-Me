@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { Building2, Landmark, PauseCircle, Plus, Users } from 'lucide-react';
+import { Building2, FolderKanban, Landmark, PauseCircle, Plus, Users } from 'lucide-react';
 import { Link } from 'react-router';
 import { platformApi } from '@/services/adminApi';
+import { analyticsApi } from '@/services/analyticsApi';
+import { BarList } from '@/components/data/BarList';
+import { CASE_STATUS } from '@/utils/caseStatus';
 import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui/primitives';
 import { PageHeader } from '@/components/data/PageHeader';
 import { StatCard } from '@/components/data/StatCard';
@@ -11,6 +14,7 @@ import { formatDate } from '@/utils/format';
 
 export default function PlatformDashboardPage() {
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['platform', 'summary'], queryFn: platformApi.summary });
+  const cases = useQuery({ queryKey: ['platform', 'case-stats'], queryFn: analyticsApi.platformCaseStats });
   if (error) return <ErrorState error={error} onRetry={refetch} />;
   const v = (n) => (isLoading ? <Skeleton className="h-8 w-14" /> : n);
   return (
@@ -31,7 +35,16 @@ export default function PlatformDashboardPage() {
         <StatCard label="Active firms" value={v(data?.firms.active)} icon={<Landmark />} hint={data ? `${data.firms.suspended} suspended · ${data.firms.deactivated} deactivated` : undefined} href="/platform/firms?status=ACTIVE" />
         <StatCard label="Employees (active firms)" value={v(data?.employees)} icon={<Users />} />
         <StatCard label="Clients (active firms)" value={v(data?.clients)} icon={<Building2 />} />
+        <StatCard label="Total valuation cases" value={v(cases.data?.total)} icon={<FolderKanban />} hint={cases.data ? `${cases.data.active} active` : undefined} />
       </div>
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Cases by status (all firms)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <BarList items={Object.entries(cases.data?.byStatus ?? {}).sort((a, b) => b[1] - a[1]).map(([s, n]) => ({ key: s, label: CASE_STATUS[s]?.label ?? s, value: n }))} emptyText="No cases on the platform yet" ariaLabel="Cases by status across all firms" />
+        </CardContent>
+      </Card>
       <Card className="mt-6">
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle>Recently registered firms</CardTitle>

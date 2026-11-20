@@ -19,7 +19,9 @@
     "db:migrate:test": "node scripts/migrate-test.js",
     "db:seed": "node prisma/seed/index.js",
     "db:seed:superadmin": "node prisma/seed/superadmin.js",
-    "db:status": "prisma migrate status"
+    "db:status": "prisma migrate status",
+    "start:worker": "node src/worker.js",
+    "dev:worker": "node --watch src/worker.js"
   },
   "prisma": {
     "seed": "node prisma/seed/index.js"
