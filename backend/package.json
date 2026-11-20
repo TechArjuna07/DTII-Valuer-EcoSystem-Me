@@ -21,7 +21,9 @@
     "db:seed:superadmin": "node prisma/seed/superadmin.js",
     "db:status": "prisma migrate status",
     "start:worker": "node src/worker.js",
-    "dev:worker": "node --watch src/worker.js"
+    "dev:worker": "node --watch src/worker.js",
+    "db:reset-dev": "node scripts/reset-dev-data.js",
+    "mail:test": "node scripts/test-mail.js"
   },
   "prisma": {
     "seed": "node prisma/seed/index.js"
