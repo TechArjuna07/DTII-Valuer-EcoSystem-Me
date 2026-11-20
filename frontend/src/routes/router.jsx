@@ -109,6 +109,7 @@ export const router = createBrowserRouter([
                 children: [
                   { path: '/cases', element: L(() => import('@/pages/cases/CasesListPage')) },
                   { path: '/cases/:id', element: L(() => import('@/pages/cases/CaseDetailPage')) },
+                  { path: '/repository', element: L(() => import('@/pages/documents/RepositoryPage')) },
                 ],
               },
               { element: <RequireAuth context="FIRM" permissions={['case.create']} />, children: [{ path: '/cases/new', element: L(() => import('@/pages/cases/CaseNewPage')) }] },

@@ -235,8 +235,8 @@ model Client {
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt     DateTime?    @map("deleted_at") @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [firmId], references: [id], onDelete: Restrict)
-  user         User?        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization Organization    @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  user         User?           @relation(fields: [userId], references: [id], onDelete: Restrict)
   cases        ValuationCase[]
 
   @@unique([firmId, id])
@@ -615,6 +615,8 @@ model ValuationCase {
   assignments   CaseAssignment[]
   statusHistory CaseStatusHistory[]
   activities    CaseActivity[]
+  documents     CaseDocument[]
+  docRequests   DocumentRequest[]
 
   @@unique([firmId, id])
   @@index([firmId, status])
@@ -686,4 +688,120 @@ model CaseActivity {
   @@index([caseId, createdAt])
   @@index([firmId, createdAt(sort: Desc)])
   @@map("case_activities")
+}
+
+// ───────────────────────────── Phase 5: document repository ─────────────────────────────
+
+enum CaseFolder {
+  SOURCE_FILES
+  INSPECTION_DOCUMENTS
+  PROPERTY_PHOTOGRAPHS
+  PRELIMINARY_VALUATION
+  SENIOR_REVIEW
+  FINAL_VALUATION_REPORT
+  CLIENT_SIGNED_FILES
+  BANK_SUBMISSION
+  SANCTION_DOCUMENTS
+  DISBURSEMENT_DOCUMENTS
+}
+
+enum DocumentVisibility {
+  INTERNAL
+  CLIENT
+}
+
+enum ScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  SKIPPED
+  ERROR
+}
+
+enum UploadSource {
+  STAFF
+  CLIENT
+  SYSTEM
+  SIGNATURE
+}
+
+enum DocumentRequestStatus {
+  OPEN
+  FULFILLED
+  CANCELLED
+}
+
+/// A logical document in a case folder. Content lives in immutable versions; the current version is the latest.
+model CaseDocument {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId           String             @map("firm_id") @db.Uuid
+  caseId           String             @map("case_id") @db.Uuid
+  folder           CaseFolder
+  documentTypeId   String?            @map("document_type_id") @db.Uuid
+  title            String             @db.VarChar(200)
+  visibility       DocumentVisibility @default(INTERNAL)
+  currentVersionId String?            @map("current_version_id") @db.Uuid
+  versionCount     Int                @default(0) @map("version_count")
+  createdById      String             @map("created_by_id") @db.Uuid
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  archivedAt       DateTime?          @map("archived_at") @db.Timestamptz(3)
+  archivedById     String?            @map("archived_by_id") @db.Uuid
+  archiveReason    String?            @map("archive_reason") @db.VarChar(500)
+
+  case     ValuationCase     @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+  versions DocumentVersion[]
+
+  @@unique([firmId, id])
+  @@index([caseId, folder])
+  @@map("case_documents")
+}
+
+/// Immutable file version. storage_key is opaque (ids only); sha256 proves integrity.
+model DocumentVersion {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId       String       @map("firm_id") @db.Uuid
+  documentId   String       @map("document_id") @db.Uuid
+  version      Int
+  storageKey   String       @unique @map("storage_key") @db.VarChar(300)
+  originalName String       @map("original_name") @db.VarChar(255)
+  mimeType     String       @map("mime_type") @db.VarChar(100)
+  sizeBytes    BigInt       @map("size_bytes")
+  sha256       String       @db.VarChar(64)
+  scanStatus   ScanStatus   @default(PENDING) @map("scan_status")
+  scannedAt    DateTime?    @map("scanned_at") @db.Timestamptz(3)
+  uploadSource UploadSource @default(STAFF) @map("upload_source")
+  uploadedById String?      @map("uploaded_by_id") @db.Uuid
+  note         String?      @db.VarChar(500)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  document CaseDocument @relation(fields: [firmId, documentId], references: [firmId, id], onDelete: Restrict)
+
+  @@unique([documentId, version])
+  @@index([firmId, createdAt])
+  @@map("document_versions")
+}
+
+/// A missing document / clarification requested from the client, the bank or internally.
+model DocumentRequest {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId              String                @map("firm_id") @db.Uuid
+  caseId              String                @map("case_id") @db.Uuid
+  documentTypeId      String?               @map("document_type_id") @db.Uuid
+  title               String                @db.VarChar(200)
+  description         String?               @db.VarChar(1000)
+  requestedFrom       String                @default("CLIENT") @map("requested_from") @db.VarChar(20)
+  status              DocumentRequestStatus @default(OPEN)
+  dueDate             DateTime?             @map("due_date") @db.Date
+  requestedById       String                @map("requested_by_id") @db.Uuid
+  fulfilledDocumentId String?               @map("fulfilled_document_id") @db.Uuid
+  fulfilledById       String?               @map("fulfilled_by_id") @db.Uuid
+  fulfilledAt         DateTime?             @map("fulfilled_at") @db.Timestamptz(3)
+  createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  case ValuationCase @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+
+  @@index([caseId, status])
+  @@map("document_requests")
 }

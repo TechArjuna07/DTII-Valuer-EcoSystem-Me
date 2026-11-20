@@ -32,6 +32,8 @@ const limiters = {
   auth: createLimiter('auth', env.AUTH_THROTTLE_LIMIT_PER_MINUTE),
   /** Refresh runs on every page load / tab, so it has its own budget. */
   refresh: createLimiter('refresh', env.REFRESH_THROTTLE_LIMIT_PER_MINUTE),
+  /** Uploads per IP per minute (a field team on one mobile network shares an IP; tune per deployment). */
+  upload: createLimiter('upload', env.UPLOAD_THROTTLE_LIMIT_PER_MINUTE),
 };
 
 export { limiters, createLimiter };

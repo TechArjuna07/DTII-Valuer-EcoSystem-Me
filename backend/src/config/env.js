@@ -63,6 +63,7 @@ const schema = z
     THROTTLE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(300),
     AUTH_THROTTLE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(20),
     REFRESH_THROTTLE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(120),
+    UPLOAD_THROTTLE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(60),
   })
   .superRefine((env, ctx) => {
     const need = (keys, why) =>

@@ -54,7 +54,14 @@ function createApp() {
       directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'", "'unsafe-inline'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:'] },
     },
   });
-  app.use((req, res, next) => (req.path.startsWith(DOCS_PATH) ? docsHelmet : apiHelmet)(req, res, next));
+  // Signed file links may be previewed in a same-origin iframe; everything else denies framing.
+  const filesHelmet = helmet({
+    contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], imgSrc: ["'self'"], styleSrc: ["'unsafe-inline'"], frameAncestors: ["'self'"] } },
+    frameguard: { action: 'sameorigin' },
+    crossOriginResourcePolicy: { policy: 'same-origin' },
+    hsts: env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+  });
+  app.use((req, res, next) => (req.path.startsWith(DOCS_PATH) ? docsHelmet : req.path.startsWith('/api/v1/files/') ? filesHelmet : apiHelmet)(req, res, next));
 
   app.use(
     cors({

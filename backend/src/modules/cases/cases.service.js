@@ -10,6 +10,7 @@ import { caseScope, findVisibleCase } from './case-access.js';
 import { byAction, PIPELINE, STAGE_ROLE, STATUS, STATUS_GROUPS, TERMINAL } from '../workflow/workflow.definition.js';
 import { activeAssignments, allowedActions, lockCase, recordActivity, transition } from '../workflow/workflow.service.js';
 
+const hasFieldAssignment = (current) => current.some((a) => a.stage === 'FIELD');
 const emitAll = (events) => events.forEach(([name, payload]) => emit(name, payload));
 
 /**
@@ -215,6 +216,12 @@ async function assignInTx(tx, principal, c, stage, employeeId, req) {
   const other = { JUNIOR: 'SENIOR', SENIOR: 'JUNIOR' }[stage];
   if (other && current.some((a) => a.stage === other && a.employeeId === employeeId)) {
     throw BadRequest('The same person cannot be both junior and senior reviewer on a case');
+  }
+  if (stage === 'FIELD' && !hasFieldAssignment(current)) {
+    const settings = await tx.organizationSettings.findUnique({ where: { firmId: c.firmId }, select: { workflowOptions: true } });
+    if (settings?.workflowOptions?.requireSourceDocument && (await tx.caseDocument.count({ where: { caseId: c.id, folder: 'SOURCE_FILES', archivedAt: null } })) === 0) {
+      throw BadRequest('Upload at least one source document before assigning the field officer');
+    }
   }
   const existing = current.find((a) => a.stage === stage);
   if (existing?.employeeId === employeeId) throw BadRequest('This employee is already assigned to that stage');
