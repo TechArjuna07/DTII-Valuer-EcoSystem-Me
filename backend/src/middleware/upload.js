@@ -21,4 +21,15 @@ function singleFile(field = 'file') {
     });
 }
 
-export { singleFile };
+/** Same as singleFile() but the file is optional (metadata-only submissions are allowed). */
+function optionalFile(field = 'file') {
+  const mw = parser.single(field);
+  return (req, res, next) =>
+    mw(req, res, (err) => {
+      if (!err) return next();
+      if (err.code === 'LIMIT_FILE_SIZE') return next(new HttpError(413, `The file is larger than ${env.UPLOAD_MAX_MB} MB`));
+      return next(new HttpError(400, `Invalid upload: send at most one file in the "${field}" field`));
+    });
+}
+
+export { singleFile, optionalFile };

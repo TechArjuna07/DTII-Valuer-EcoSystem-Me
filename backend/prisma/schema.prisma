@@ -624,6 +624,9 @@ model ValuationCase {
   reports       ValuationReport[]
   approvals     ClientApproval[]
   signatures    DigitalSignature[]
+  submissions   BankSubmission[]
+  sanction      LoanSanction?
+  disbursements LoanDisbursement[]
 
   @@unique([firmId, id])
   @@index([firmId, status])
@@ -1134,4 +1137,79 @@ model DigitalSignature {
   @@index([status, provider])
   @@index([sourceVersionId])
   @@map("digital_signatures")
+}
+
+// ───────────────────────────── Phase 9: bank submission, sanction, disbursement ─────────────────────────────
+
+enum SubmissionMode {
+  DIGITAL
+  PHYSICAL
+  BOTH
+}
+
+enum SanctionOutcome {
+  SANCTIONED
+  DECLINED
+}
+
+/// Submission of the signed report to the bank / NBFC (digital and / or physical), with acknowledgement.
+model BankSubmission {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId          String         @map("firm_id") @db.Uuid
+  caseId          String         @map("case_id") @db.Uuid
+  mode            SubmissionMode
+  submittedOn     DateTime       @map("submitted_on") @db.Date
+  submittedTo     String?        @map("submitted_to") @db.VarChar(150)
+  ackNumber       String?        @map("ack_number") @db.VarChar(80)
+  ackDocumentId   String?        @map("ack_document_id") @db.Uuid
+  signedVersionId String?        @map("signed_version_id") @db.Uuid
+  remarks         String?        @db.VarChar(1000)
+  submittedById   String         @map("submitted_by_id") @db.Uuid
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  case ValuationCase @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+
+  @@index([caseId, submittedOn])
+  @@map("bank_submissions")
+}
+
+/// The lender's decision (one per case).
+model LoanSanction {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId           String          @map("firm_id") @db.Uuid
+  caseId           String          @unique @map("case_id") @db.Uuid
+  outcome          SanctionOutcome
+  amount           Decimal?        @db.Decimal(18, 2)
+  sanctionDate     DateTime        @map("sanction_date") @db.Date
+  referenceNo      String?         @map("reference_no") @db.VarChar(80)
+  letterDocumentId String?         @map("letter_document_id") @db.Uuid
+  remarks          String?         @db.VarChar(1000)
+  recordedById     String          @map("recorded_by_id") @db.Uuid
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  case ValuationCase @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+
+  @@unique([firmId, caseId])
+  @@map("loan_sanctions")
+}
+
+/// A disbursement tranche; the final tranche moves the case to DISBURSED.
+model LoanDisbursement {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId          String   @map("firm_id") @db.Uuid
+  caseId          String   @map("case_id") @db.Uuid
+  trancheNo       Int      @map("tranche_no")
+  amount          Decimal  @db.Decimal(18, 2)
+  disbursedOn     DateTime @map("disbursed_on") @db.Date
+  referenceNo     String?  @map("reference_no") @db.VarChar(80)
+  proofDocumentId String?  @map("proof_document_id") @db.Uuid
+  isFinal         Boolean  @default(false) @map("is_final")
+  remarks         String?  @db.VarChar(1000)
+  recordedById    String   @map("recorded_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  case ValuationCase @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+
+  @@unique([caseId, trancheNo])
+  @@map("loan_disbursements")
 }
