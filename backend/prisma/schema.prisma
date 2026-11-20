@@ -622,6 +622,8 @@ model ValuationCase {
   property      PropertyDetails?
   inspections   PropertyInspection[]
   reports       ValuationReport[]
+  approvals     ClientApproval[]
+  signatures    DigitalSignature[]
 
   @@unique([firmId, id])
   @@index([firmId, status])
@@ -1040,4 +1042,96 @@ model ReportTemplateVersion {
 
   @@unique([templateId, version])
   @@map("report_template_versions")
+}
+
+// ───────────────────────────── Phase 8: client approval & digital signatures ─────────────────────────────
+
+enum ApprovalDecision {
+  APPROVED
+  QUERY
+}
+
+enum SignerRole {
+  VALUER
+  CLIENT
+}
+
+enum SignatureStatus {
+  PENDING
+  SIGNED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum SignatureVerification {
+  UNVERIFIED
+  VERIFIED
+  INVALID
+}
+
+/// Client decision on a released final report version (append-only).
+model ClientApproval {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId          String           @map("firm_id") @db.Uuid
+  caseId          String           @map("case_id") @db.Uuid
+  reportVersionId String           @map("report_version_id") @db.Uuid
+  decision        ApprovalDecision
+  comments        String?          @db.VarChar(3000)
+  clientUserId    String           @map("client_user_id") @db.Uuid
+  ip              String?          @db.VarChar(64)
+  userAgent       String?          @map("user_agent") @db.VarChar(400)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  case ValuationCase @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+
+  @@index([caseId, createdAt])
+  @@map("client_approvals")
+}
+
+/// A digital signature request / record on a document version, with provider and verification details.
+/// Uploaded images of signatures are never accepted: every record comes from a signature provider.
+model DigitalSignature {
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId             String                @map("firm_id") @db.Uuid
+  caseId             String                @map("case_id") @db.Uuid
+  sourceVersionId    String                @map("source_version_id") @db.Uuid
+  signedVersionId    String?               @map("signed_version_id") @db.Uuid
+  reportVersionId    String?               @map("report_version_id") @db.Uuid
+  signerUserId       String                @map("signer_user_id") @db.Uuid
+  signerRole         SignerRole            @map("signer_role")
+  signerName         String                @map("signer_name") @db.VarChar(150)
+  signerEmail        String                @map("signer_email") @db.Citext
+  provider           String                @db.VarChar(30)
+  providerRef        String?               @map("provider_ref") @db.VarChar(120)
+  status             SignatureStatus       @default(PENDING)
+  documentSha256     String                @map("document_sha256") @db.VarChar(64)
+  signedSha256       String?               @map("signed_sha256") @db.VarChar(64)
+  certSubject        String?               @map("cert_subject") @db.VarChar(400)
+  certIssuer         String?               @map("cert_issuer") @db.VarChar(400)
+  certSerial         String?               @map("cert_serial") @db.VarChar(120)
+  certValidFrom      DateTime?             @map("cert_valid_from") @db.Timestamptz(3)
+  certValidTo        DateTime?             @map("cert_valid_to") @db.Timestamptz(3)
+  signatureAlgorithm String?               @map("signature_algorithm") @db.VarChar(60)
+  signatureValue     String?               @map("signature_value")
+  verificationStatus SignatureVerification @default(UNVERIFIED) @map("verification_status")
+  verificationDetail Json                  @default("{}") @map("verification_detail")
+  legallyValid       Boolean               @default(false) @map("legally_valid")
+  consentText        String                @map("consent_text") @db.VarChar(1000)
+  ip                 String?               @db.VarChar(64)
+  userAgent          String?               @map("user_agent") @db.VarChar(400)
+  requestedAt        DateTime              @default(now()) @map("requested_at") @db.Timestamptz(3)
+  signedAt           DateTime?             @map("signed_at") @db.Timestamptz(3)
+  verifiedAt         DateTime?             @map("verified_at") @db.Timestamptz(3)
+  lastSyncedAt       DateTime?             @map("last_synced_at") @db.Timestamptz(3)
+  lastError          String?               @map("last_error") @db.VarChar(500)
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  case ValuationCase @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+
+  @@index([caseId, signerRole])
+  @@index([status, provider])
+  @@index([sourceVersionId])
+  @@map("digital_signatures")
 }

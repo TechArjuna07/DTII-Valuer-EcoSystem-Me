@@ -1,4 +1,4 @@
-import { acceptInvite, api, app, as, createEmployee, createFirm, createSuperadmin, login, request, uniq } from './helpers.js';
+import { acceptInvite, api, app, as, createEmployee, createFirm, createSuperadmin, login, PASSWORD, request, uniq } from './helpers.js';
 
 /** Minimal valid files (magic bytes). */
 export const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
@@ -83,4 +83,17 @@ export async function completeFinal(fx, caseId, { templateId } = {}) {
   const v = await sr.post(`/cases/${caseId}/valuations/final/versions`, { inputs: LB_INPUTS, summary: 'Final valuation for lending purposes.', ...(templateId ? { templateId } : {}) });
   if (v.status !== 201) throw new Error(`final version failed: ${JSON.stringify(v.body)}`);
   return sr.post(`/cases/${caseId}/valuations/final/approve`, { comments: 'Approved for issue' });
+}
+
+/** Valuer signs the approved final report and releases it to the client (→ CLIENT_APPROVAL_PENDING). */
+export async function signAndRelease(fx, caseId) {
+  const s = await as(fx.sr.token).post(`/cases/${caseId}/signatures/valuer`, { password: PASSWORD, consent: true });
+  if (s.status !== 200) throw new Error(`valuer signature failed: ${JSON.stringify(s.body)}`);
+  return as(fx.sr.token).post(`/cases/${caseId}/approval/release`);
+}
+
+/** Client approves and signs (→ CLIENT_SIGNED). */
+export async function clientApproveAndSign(fx, caseId) {
+  await as(fx.client.token).post(`/cases/${caseId}/approval/decision`, { decision: 'APPROVED' });
+  return as(fx.client.token).post(`/cases/${caseId}/signatures/client`, { password: PASSWORD, consent: true });
 }

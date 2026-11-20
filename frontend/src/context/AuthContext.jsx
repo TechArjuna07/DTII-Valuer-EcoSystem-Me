@@ -17,6 +17,7 @@ export function homeFor(me) {
   const perms = me.context.permissions;
   if (perms.includes('employee.manage')) return '/dashboard';
   if (perms.includes('inspection.perform')) return '/inspections';
+  if (perms.includes('portal.access')) return '/portal';
   if (perms.includes('case.view') || perms.includes('portal.access')) return '/cases';
   return '/account';
 }

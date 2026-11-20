@@ -56,6 +56,11 @@ const schema = z
     M365_CLIENT_SECRET: z.string().optional(),
     M365_SENDER: z.string().optional(),
 
+    SIGNATURE_PROVIDER: z.enum(['sandbox', 'dtii-signer']).default('sandbox'),
+    SIGNER_BASE_URL: z.string().url().optional(),
+    SIGNER_API_KEY: z.string().min(16).optional(),
+    SANDBOX_SIGNING_KEY: z.string().optional(),
+
     PDF_RENDERER: z.enum(['chrome', 'none']).default('chrome'),
     CHROME_PATH: z.string().optional(),
 
@@ -74,6 +79,7 @@ const schema = z
         if (!env[k]) ctx.addIssue({ code: 'custom', path: [k], message: `required when ${why}` });
       });
     if (env.STORAGE_DRIVER === 's3') need(['S3_BUCKET'], 'STORAGE_DRIVER=s3');
+    if (env.SIGNATURE_PROVIDER === 'dtii-signer') need(['SIGNER_BASE_URL', 'SIGNER_API_KEY'], 'SIGNATURE_PROVIDER=dtii-signer');
     if (env.MAIL_PROVIDER === 'gmail') need(['GMAIL_SMTP_USER', 'GMAIL_SMTP_APP_PASSWORD'], 'MAIL_PROVIDER=gmail');
     if (env.MAIL_PROVIDER === 'office365') need(['M365_TENANT_ID', 'M365_CLIENT_ID', 'M365_CLIENT_SECRET', 'M365_SENDER'], 'MAIL_PROVIDER=office365');
     if (env.NODE_ENV === 'production') {
@@ -81,13 +87,15 @@ const schema = z
       if (!env.COOKIE_SECURE) ctx.addIssue({ code: 'custom', path: ['COOKIE_SECURE'], message: 'must be true in production' });
       if (env.CORS_ORIGINS.includes('*')) ctx.addIssue({ code: 'custom', path: ['CORS_ORIGINS'], message: 'wildcard CORS is not allowed' });
       if (env.STORAGE_DRIVER !== 's3') ctx.addIssue({ code: 'custom', path: ['STORAGE_DRIVER'], message: 'use s3 in production' });
+      if (env.SIGNATURE_PROVIDER === 'sandbox') ctx.addIssue({ code: 'custom', path: ['SIGNATURE_PROVIDER'], message: 'the sandbox signer is not legally valid; configure a certificate-based provider in production' });
       if (env.MAIL_PROVIDER === 'log') ctx.addIssue({ code: 'custom', path: ['MAIL_PROVIDER'], message: 'log provider is not allowed in production' });
     }
   });
 
 /** Parses the given source. Errors list variable names and reasons only — never values. */
 function loadEnv(source = process.env) {
-  const parsed = schema.safeParse(source);
+  // Empty values (e.g. `SIGNER_BASE_URL=`) mean "not set".
+  const parsed = schema.safeParse(Object.fromEntries(Object.entries(source).filter(([, v]) => v !== '')));
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     throw new Error(`Invalid environment configuration: ${issues}`);

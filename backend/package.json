@@ -41,6 +41,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2",
     "nodemailer": "^7",
+    "pdf-lib": "^1",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
     "puppeteer-core": "^24",

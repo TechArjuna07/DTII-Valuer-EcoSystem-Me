@@ -12,6 +12,7 @@ export const NAV = [
     items: [
       { href: '/platform', label: 'Platform Dashboard', icon: LayoutDashboard, context: 'PLATFORM', any: ['platform.dashboard.view'], exact: true },
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, context: 'FIRM', any: ['employee.manage'] },
+      { href: '/portal', label: 'My Dashboard', icon: LayoutDashboard, context: 'FIRM', any: ['portal.access'] },
     ],
   },
   {
