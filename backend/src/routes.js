@@ -9,6 +9,7 @@ import masters from './modules/masters/masters.routes.js';
 import cases from './modules/cases/cases.routes.js';
 import documents from './modules/documents/documents.routes.js';
 import files from './modules/documents/files.routes.js';
+import inspections from './modules/inspections/inspections.routes.js';
 
 /** /api/v1 router. Each module mounts its own router here. */
 const v1 = Router();
@@ -22,6 +23,7 @@ v1.use('/clients', clients);
 v1.use('/masters', masters);
 v1.use('/files', files);
 v1.use(documents);
+v1.use(inspections);
 v1.use('/cases', cases);
 
 export { v1 };

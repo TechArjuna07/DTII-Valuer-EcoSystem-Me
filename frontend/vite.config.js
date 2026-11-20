@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 
@@ -20,10 +21,12 @@ export default defineConfig(({ mode }) => {
   };
 
   return {
-    plugins: [react(), tailwindcss()],
+    // DEV_HTTPS=true serves https://<LAN-IP>:3100 with a self-signed certificate, because phone browsers only allow
+    // camera and GPS (field inspections) in a secure context. Add that origin to the API CORS_ORIGINS when used.
+    plugins: [react(), tailwindcss(), ...(env.DEV_HTTPS === 'true' ? [basicSsl()] : [])],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     // Port 3100 is in the API's CORS / CSRF origin allowlist (the CA Ecosystem uses 3000).
-    server: { port: 3100, strictPort: true, proxy, headers: securityHeaders },
+    server: { port: 3100, strictPort: true, proxy, headers: securityHeaders, host: env.DEV_HTTPS === 'true' ? true : 'localhost' },
     preview: { port: 3100, strictPort: true, proxy, headers: securityHeaders },
     build: {
       target: 'es2022',

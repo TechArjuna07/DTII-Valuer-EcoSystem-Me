@@ -112,6 +112,7 @@ export const router = createBrowserRouter([
                   { path: '/repository', element: L(() => import('@/pages/documents/RepositoryPage')) },
                 ],
               },
+              { element: <RequireAuth context="FIRM" permissions={['inspection.perform']} />, children: [{ path: '/inspections', element: L(() => import('@/pages/field-officer/MyInspectionsPage')) }] },
               { element: <RequireAuth context="FIRM" permissions={['case.create']} />, children: [{ path: '/cases/new', element: L(() => import('@/pages/cases/CaseNewPage')) }] },
               {
                 element: <RequireAuth context="FIRM" permissions={['master.manage']} />,

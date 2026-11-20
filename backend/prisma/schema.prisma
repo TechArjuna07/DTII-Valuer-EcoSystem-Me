@@ -198,6 +198,7 @@ model EmployeeProfile {
   user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   assignments CaseAssignment[]
+  inspections PropertyInspection[]
 
   @@unique([firmId, id])
   @@unique([firmId, userId])
@@ -607,16 +608,18 @@ model ValuationCase {
   createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization  Organization        @relation(fields: [firmId], references: [id], onDelete: Restrict)
-  client        Client              @relation(fields: [firmId, clientId], references: [firmId, id], onDelete: Restrict)
-  bank          Bank                @relation(fields: [firmId, bankId], references: [firmId, id], onDelete: Restrict)
-  financialYear FinancialYear       @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
-  category      ValuationCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  organization  Organization         @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  client        Client               @relation(fields: [firmId, clientId], references: [firmId, id], onDelete: Restrict)
+  bank          Bank                 @relation(fields: [firmId, bankId], references: [firmId, id], onDelete: Restrict)
+  financialYear FinancialYear        @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+  category      ValuationCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   assignments   CaseAssignment[]
   statusHistory CaseStatusHistory[]
   activities    CaseActivity[]
   documents     CaseDocument[]
   docRequests   DocumentRequest[]
+  property      PropertyDetails?
+  inspections   PropertyInspection[]
 
   @@unique([firmId, id])
   @@index([firmId, status])
@@ -804,4 +807,106 @@ model DocumentRequest {
 
   @@index([caseId, status])
   @@map("document_requests")
+}
+
+// ───────────────────────────── Phase 6: property details & inspection ─────────────────────────────
+
+enum PropertyCondition {
+  EXCELLENT
+  GOOD
+  AVERAGE
+  POOR
+  DILAPIDATED
+}
+
+enum InspectionStatus {
+  DRAFT
+  SUBMITTED
+}
+
+enum PhotoKind {
+  PROPERTY
+  LOCATION
+  LANDMARK
+  OTHER
+}
+
+/// Category-specific property / asset data (validated against category_field_definitions).
+model PropertyDetails {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId        String   @map("firm_id") @db.Uuid
+  caseId        String   @unique @map("case_id") @db.Uuid
+  fieldsVersion Int      @map("fields_version")
+  data          Json     @default("{}")
+  updatedById   String?  @map("updated_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  case ValuationCase @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+
+  @@unique([firmId, caseId])
+  @@map("property_details")
+}
+
+/// Site inspection. One row per round; a re-inspection requested by the senior reviewer starts a new round.
+model PropertyInspection {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId            String             @map("firm_id") @db.Uuid
+  caseId            String             @map("case_id") @db.Uuid
+  round             Int                @default(1)
+  officerId         String             @map("officer_id") @db.Uuid
+  status            InspectionStatus   @default(DRAFT)
+  scheduledAt       DateTime?          @map("scheduled_at") @db.Timestamptz(3)
+  startedAt         DateTime?          @map("started_at") @db.Timestamptz(3)
+  inspectedAt       DateTime?          @map("inspected_at") @db.Timestamptz(3)
+  submittedAt       DateTime?          @map("submitted_at") @db.Timestamptz(3)
+  gpsLat            Decimal?           @map("gps_lat") @db.Decimal(10, 7)
+  gpsLng            Decimal?           @map("gps_lng") @db.Decimal(10, 7)
+  gpsAccuracyM      Decimal?           @map("gps_accuracy_m") @db.Decimal(8, 2)
+  gpsCapturedAt     DateTime?          @map("gps_captured_at") @db.Timestamptz(3)
+  gpsConsent        Boolean?           @map("gps_consent")
+  gpsDeclinedReason String?            @map("gps_declined_reason") @db.VarChar(300)
+  propertyType      String?            @map("property_type") @db.VarChar(80)
+  propertyAddress   String?            @map("property_address") @db.VarChar(500)
+  landArea          Decimal?           @map("land_area") @db.Decimal(14, 3)
+  landAreaUnit      String?            @map("land_area_unit") @db.VarChar(20)
+  buildingArea      Decimal?           @map("building_area") @db.Decimal(14, 3)
+  buildingAreaUnit  String?            @map("building_area_unit") @db.VarChar(20)
+  condition         PropertyCondition?
+  construction      Json               @default("{}")
+  landmarks         Json               @default("[]")
+  boundaries        Json               @default("{}")
+  observations      Json               @default("{}")
+  officerRemarks    String?            @map("officer_remarks") @db.VarChar(3000)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  case    ValuationCase     @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+  officer EmployeeProfile   @relation(fields: [firmId, officerId], references: [firmId, id], onDelete: Restrict)
+  photos  InspectionPhoto[]
+
+  @@unique([firmId, id])
+  @@unique([caseId, round])
+  @@index([firmId, officerId, status])
+  @@index([firmId, scheduledAt])
+  @@map("property_inspections")
+}
+
+/// A photograph taken during an inspection; the image itself is a document in 03_Property_Photographs.
+model InspectionPhoto {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId       String    @map("firm_id") @db.Uuid
+  inspectionId String    @map("inspection_id") @db.Uuid
+  documentId   String    @map("document_id") @db.Uuid
+  kind         PhotoKind @default(PROPERTY)
+  caption      String?   @db.VarChar(300)
+  gpsLat       Decimal?  @map("gps_lat") @db.Decimal(10, 7)
+  gpsLng       Decimal?  @map("gps_lng") @db.Decimal(10, 7)
+  capturedAt   DateTime? @map("captured_at") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  inspection PropertyInspection @relation(fields: [firmId, inspectionId], references: [firmId, id], onDelete: Cascade)
+
+  @@index([inspectionId])
+  @@map("inspection_photos")
 }

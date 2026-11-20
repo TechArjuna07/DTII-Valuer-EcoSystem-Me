@@ -18,7 +18,7 @@ export default [
       ...reactHooks.configs.recommended.rules,
       // JSX identifiers count as used.
       'no-unused-vars': ['error', { argsIgnorePattern: '^_|^[A-Z]', varsIgnorePattern: '^_|^[A-Z]' }],
-      eqeqeq: ['error', 'always'],
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
     },
   },
 ];

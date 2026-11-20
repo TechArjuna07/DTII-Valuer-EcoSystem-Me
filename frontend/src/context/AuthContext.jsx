@@ -16,6 +16,7 @@ export function homeFor(me) {
   if (me.context.type === 'PLATFORM') return '/platform';
   const perms = me.context.permissions;
   if (perms.includes('employee.manage')) return '/dashboard';
+  if (perms.includes('inspection.perform')) return '/inspections';
   if (perms.includes('case.view') || perms.includes('portal.access')) return '/cases';
   return '/account';
 }

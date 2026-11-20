@@ -1,4 +1,4 @@
-import { Archive, Building2, CalendarRange, FileType2, FolderKanban, Layers, Landmark, LayoutDashboard, Route, ScrollText, Settings, ShieldCheck, UserRound, Users } from 'lucide-react';
+import { Archive, Building2, ClipboardCheck, CalendarRange, FileType2, FolderKanban, Layers, Landmark, LayoutDashboard, Route, ScrollText, Settings, ShieldCheck, UserRound, Users } from 'lucide-react';
 
 /**
  * Sidebar navigation. Items are shown by CONTEXT (platform / firm) and PERMISSION, so each role only sees
@@ -24,6 +24,7 @@ export const NAV = [
   {
     section: 'Work',
     items: [
+      { href: '/inspections', label: 'My Inspections', icon: ClipboardCheck, context: 'FIRM', any: ['inspection.perform'] },
       { href: '/cases', label: 'Cases', icon: FolderKanban, context: 'FIRM', any: ['case.view', 'portal.access'] },
       { href: '/repository', label: 'Document Repository', icon: Archive, context: 'FIRM', any: ['client.view', 'portal.access'] },
     ],
