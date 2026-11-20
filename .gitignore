@@ -27,3 +27,7 @@ frontend/test-results/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Internal documentation and infrastructure scripts: kept locally, not published to the remote
+docs/
+infra/

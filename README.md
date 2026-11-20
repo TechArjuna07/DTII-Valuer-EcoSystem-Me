@@ -2,7 +2,9 @@
 
 A secure, multi-tenant platform that digitises the property valuation workflow between valuation firms, clients (loan applicants), banks and NBFCs. Each case gets a permanent Case ID and its own document repository, workflow and append-only activity trail.
 
-Architecture, ER diagrams, the RBAC matrix, the workflow and the phase plan are in [docs/PHASE_1_ARCHITECTURE_AND_PLAN.md](docs/PHASE_1_ARCHITECTURE_AND_PLAN.md).
+Architecture, ER diagrams, the RBAC matrix, the workflow and the phase plan are in `docs/PHASE_1_ARCHITECTURE_AND_PLAN.md`.
+
+> `docs/` and `infra/` are kept out of this repository (see `.gitignore`). Ask the project owner for a copy; the setup steps below that use `infra/` need it.
 
 ## Tech stack
 
@@ -102,8 +104,8 @@ Integration tests run against `valuers_ecosystem_test` (migrated automatically) 
 ```
 backend/    Express API (src/config, database, middleware, modules, services, jobs, utils) + prisma/
 frontend/   React SPA (src/components, layouts, pages, services, routes, context, hooks, utils)
-infra/      redis/ (docker compose), postgres/ (role & database bootstrap scripts)
-docs/       Architecture, API, database, security and deployment documentation
+infra/      redis/ (docker compose), postgres/ (role & database bootstrap scripts)   [not in the repository]
+docs/       Architecture, API, database, security and deployment documentation    [not in the repository]
 ```
 
 ## Running the background worker
@@ -117,13 +119,15 @@ pnpm --filter @valuers/backend start:worker     # RUN_MODE=worker
 
 ## Documentation
 
+These files are kept outside the repository (ask the project owner):
+
 | Document | Contents |
 |---|---|
-| [docs/PHASE_1_ARCHITECTURE_AND_PLAN.md](docs/PHASE_1_ARCHITECTURE_AND_PLAN.md) | Architecture, ER diagrams, RBAC matrix, workflow, decisions |
-| [docs/API.md](docs/API.md) | API overview (full reference: Swagger at `/api/docs`) |
-| [docs/DATABASE.md](docs/DATABASE.md) | Tables, roles, database-enforced integrity rules |
-| [docs/VAPT_CHECKLIST.md](docs/VAPT_CHECKLIST.md) | Security controls mapped to automated tests, residual risks |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment (S3, PostgreSQL, Redis, nginx, PM2, email, go-live checklist) |
+| `docs/PHASE_1_ARCHITECTURE_AND_PLAN.md` | Architecture, ER diagrams, RBAC matrix, workflow, decisions |
+| `docs/API.md` | API overview (full reference: Swagger at `/api/docs`) |
+| `docs/DATABASE.md` | Tables, roles, database-enforced integrity rules |
+| `docs/VAPT_CHECKLIST.md` | Security controls mapped to automated tests, residual risks |
+| `docs/DEPLOYMENT.md` | Production deployment (S3, PostgreSQL, Redis, nginx, PM2, email, go-live checklist) |
 
 Load test (against a running API): `LOAD_EMAIL=… LOAD_PASSWORD=… node backend/scripts/load-test.js --create 50`.
 Mobile camera / GPS testing over HTTPS: `pnpm --filter @valuers/frontend dev:https`.
