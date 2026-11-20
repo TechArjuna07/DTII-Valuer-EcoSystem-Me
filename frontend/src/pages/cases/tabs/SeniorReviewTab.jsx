@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BadgeCheck, CheckCircle2, CornerUpLeft, XCircle } from 'lucide-react';
+import { BadgeCheck, CheckCircle2, CornerUpLeft, FileSignature, XCircle } from 'lucide-react';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { valuationsApi } from '@/services/valuationsApi';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Label, Skeleton, Textarea } from '@/components/ui/primitives';
@@ -16,6 +17,8 @@ export default function SeniorReviewTab({ c }) {
   const [decision, setDecision] = useState(null);
   const [comments, setComments] = useState('');
   const [approving, setApproving] = useState(false);
+  const [, setSp] = useSearchParams();
+  const goSign = () => setSp({ tab: 'approval' }, { replace: true });
   const after = (res, msg) => {
     qc.setQueryData(['valuations', c.id], res);
     qc.invalidateQueries({ queryKey: ['cases', 'detail', c.id] });
@@ -29,7 +32,7 @@ export default function SeniorReviewTab({ c }) {
   });
   const approve = useMutation({
     mutationFn: () => valuationsApi.approveFinal(c.id, comments.trim() || undefined),
-    onSuccess: (res) => (after(res, 'Final report approved'), setApproving(false)),
+    onSuccess: (res) => (after(res, 'Final report approved. Sign it to send it to the client.'), setApproving(false), goSign()),
     onError: (e) => toast.error(e.message),
   });
   if (error) return <ErrorState error={error} onRetry={refetch} />;
@@ -38,6 +41,19 @@ export default function SeniorReviewTab({ c }) {
 
   return (
     <div className="space-y-6">
+      {c.status === 'FINAL_APPROVED' && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div>
+              <p className="font-medium">Next step: sign the final report as valuer</p>
+              <p className="text-sm text-muted-foreground">Once signed, the report is sent to the client for review and acceptance.</p>
+            </div>
+            <Button onClick={goSign}>
+              <FileSignature /> Sign final report
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       {perm.canReview && (
         <Card>
           <CardHeader>

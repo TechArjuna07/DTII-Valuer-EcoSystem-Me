@@ -30,7 +30,7 @@ export const CASE_TABS = [
     Component: SeniorReviewTab,
     show: ({ me, c, isClient }) => !isClient && (hasRole(me, 'FIRM_ADMIN', 'JUNIOR_REVIEWER', 'SENIOR_REVIEWER') || AFTER_FINAL.includes(c.status)),
   },
-  { key: 'approval', label: 'Client approval', Component: ApprovalTab, show: ({ c, isClient, me }) => isClient || hasRole(me, 'FIRM_ADMIN', 'SENIOR_REVIEWER', 'MARKETING') || AFTER_FINAL.includes(c.status) },
+  { key: 'approval', label: 'Signature & client approval', Component: ApprovalTab, show: ({ c, isClient, me }) => isClient || hasRole(me, 'FIRM_ADMIN', 'SENIOR_REVIEWER', 'MARKETING') || AFTER_FINAL.includes(c.status) },
   { key: 'bank', label: 'Bank submission', Component: BankSubmissionTab, show: ({ c, isClient }) => !isClient || AT_BANK.includes(c.status) },
   { key: 'loan', label: 'Sanction & disbursement', Component: SanctionDisbursementTab, show: ({ c }) => AT_BANK.includes(c.status) },
   { key: 'timeline', label: 'Activity timeline', Component: TimelineTab, show: () => true },

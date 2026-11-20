@@ -104,7 +104,11 @@ export default function ApprovalTab({ c, isClient }) {
     qc.invalidateQueries({ queryKey: ['documents', c.id] });
     toast.success(msg);
   };
-  const act = useMutation({ mutationFn: ({ fn }) => fn(), onSuccess: (res, v) => done(res, v.msg), onError: (e) => toast.error(e.message) });
+  const act = useMutation({
+    mutationFn: ({ fn }) => fn(),
+    onSuccess: (res, v) => done(res, v.role === 'VALUER' && res.caseStatus === 'CLIENT_APPROVAL_PENDING' ? 'Signed and sent to the client for approval' : v.msg),
+    onError: (e) => toast.error(e.message),
+  });
   if (error) return <ErrorState error={error} onRetry={refetch} />;
   if (isLoading) return <Skeleton className="h-80" />;
   const f = data.finalReport;
@@ -203,7 +207,7 @@ export default function ApprovalTab({ c, isClient }) {
           onClose={() => setSigning(null)}
           onSign={(password) =>
             act.mutate(
-              { fn: () => (signing === 'VALUER' ? approvalsApi.signValuer(c.id, password) : approvalsApi.signClient(c.id, password)), msg: data.provider.synchronous ? 'Signed successfully' : 'Signature request sent to the signing app' },
+              { role: signing, fn: () => (signing === 'VALUER' ? approvalsApi.signValuer(c.id, password) : approvalsApi.signClient(c.id, password)), msg: data.provider.synchronous ? 'Signed successfully' : 'Signature request sent to the signing app' },
               { onSuccess: () => setSigning(null) },
             )
           }
