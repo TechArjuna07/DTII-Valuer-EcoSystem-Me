@@ -14,7 +14,7 @@ const STAGE_PERMISSION = { MARKETING: 'case.assign.field', FIELD: 'case.assign.f
 function AssignDialog({ caseId, stage, current, open, onOpenChange }) {
   const qc = useQueryClient();
   const [employeeId, setEmployeeId] = useState('');
-  const { data } = useQuery({ queryKey: ['assignable', stage], queryFn: () => casesApi.assignable(stage), enabled: open });
+  const { data } = useQuery({ queryKey: ['assignable', stage, caseId], queryFn: () => casesApi.assignable(stage, caseId), enabled: open });
   const m = useMutation({
     mutationFn: () => casesApi.assign(caseId, stage, employeeId),
     onSuccess: (c) => {
@@ -159,7 +159,7 @@ export default function OverviewTab({ c, can, isClient }) {
           <CardContent className="space-y-3">
             {['MARKETING', 'FIELD', 'JUNIOR', 'SENIOR'].map((stage) => {
               const a = c.assignments.find((x) => x.stage === stage);
-              const canAssign = can(STAGE_PERMISSION[stage]) && !['CASE_COMPLETED', 'CASE_CANCELLED', 'CASE_REJECTED'].includes(c.status);
+              const canAssign = (can(STAGE_PERMISSION[stage]) || c.handoverStages?.includes(stage)) && !['CASE_COMPLETED', 'CASE_CANCELLED', 'CASE_REJECTED'].includes(c.status);
               return (
                 <div key={stage} className="flex items-center gap-3 rounded-lg border p-3">
                   <div className="min-w-0 flex-1">

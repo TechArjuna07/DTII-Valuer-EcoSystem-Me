@@ -6,6 +6,7 @@ import { inspectionsApi } from '@/services/inspectionsApi';
 import { documentsApi } from '@/services/documentsApi';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, NativeSelect, Skeleton, Textarea } from '@/components/ui/primitives';
 import { ConfirmDialog } from '@/components/ui/overlays';
+import { HandoverPicker } from '@/components/cases/HandoverPicker';
 import { EmptyState, ErrorState } from '@/components/data/States';
 import { cn } from '@/utils/cn';
 import { formatDateTime, humanize } from '@/utils/format';
@@ -104,6 +105,7 @@ export default function InspectionTab({ c }) {
   const [declineReason, setDeclineReason] = useState('');
   const [uploading, setUploading] = useState(0);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [nextJunior, setNextJunior] = useState('');
   useEffect(() => data && setForm(toForm(data.current)), [data]);
 
   const refresh = (res) => {
@@ -424,8 +426,10 @@ export default function InspectionTab({ c }) {
         description="Findings and photographs are locked and the case moves to the junior technical reviewer."
         confirmLabel="Submit"
         loading={call.isPending}
-        onConfirm={() => call.mutate(() => inspectionsApi.submit(c.id), { onSuccess: () => (setConfirmSubmit(false), toast.success('Inspection submitted')) })}
-      />
+        onConfirm={() => call.mutate(() => inspectionsApi.submit(c.id, nextJunior), { onSuccess: () => (setConfirmSubmit(false), toast.success('Inspection submitted')) })}
+      >
+        {confirmSubmit && !c.assignments.some((a) => a.stage === 'JUNIOR') && <HandoverPicker caseId={c.id} stage="JUNIOR" value={nextJunior} onChange={setNextJunior} />}
+      </ConfirmDialog>
     </div>
   );
 }

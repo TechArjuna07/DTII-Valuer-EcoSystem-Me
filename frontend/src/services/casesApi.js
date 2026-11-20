@@ -8,7 +8,7 @@ export const casesApi = {
   assign: (id, stage, employeeId) => api.post(`/cases/${id}/assignments`, { stage, employeeId }),
   transition: (id, action, remarks) => api.post(`/cases/${id}/transitions`, { action, ...(remarks ? { remarks } : {}) }),
   timeline: (id) => api.get(`/cases/${id}/timeline`),
-  assignable: (stage) => api.get('/cases/assignable-employees', { stage }),
+  assignable: (stage, caseId) => api.get('/cases/assignable-employees', { stage, caseId }),
 };
 
 export const mastersApi = {

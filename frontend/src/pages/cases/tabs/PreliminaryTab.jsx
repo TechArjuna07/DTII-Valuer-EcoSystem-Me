@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { valuationsApi } from '@/services/valuationsApi';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Skeleton, Textarea } from '@/components/ui/primitives';
 import { ConfirmDialog } from '@/components/ui/overlays';
+import { HandoverPicker } from '@/components/cases/HandoverPicker';
 import { EmptyState, ErrorState } from '@/components/data/States';
 import { cleanInputs, EngineInputs } from '@/components/valuation/EngineInputs';
 import { ValuationVersions } from '@/components/valuation/ValuationVersions';
@@ -94,8 +95,9 @@ export default function PreliminaryTab({ c }) {
   const qc = useQueryClient();
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['valuations', c.id], queryFn: () => valuationsApi.get(c.id) });
   const [confirm, setConfirm] = useState(false);
+  const [nextSenior, setNextSenior] = useState('');
   const submit = useMutation({
-    mutationFn: () => valuationsApi.submitPreliminary(c.id),
+    mutationFn: () => valuationsApi.submitPreliminary(c.id, nextSenior),
     onSuccess: (res) => {
       qc.setQueryData(['valuations', c.id], res);
       qc.invalidateQueries({ queryKey: ['cases', 'detail', c.id] });
@@ -145,7 +147,9 @@ export default function PreliminaryTab({ c }) {
         confirmLabel="Submit"
         loading={submit.isPending}
         onConfirm={() => submit.mutate()}
-      />
+      >
+        {confirm && !c.assignments.some((a) => a.stage === 'SENIOR') && <HandoverPicker caseId={c.id} stage="SENIOR" value={nextSenior} onChange={setNextSenior} />}
+      </ConfirmDialog>
     </div>
   );
 }

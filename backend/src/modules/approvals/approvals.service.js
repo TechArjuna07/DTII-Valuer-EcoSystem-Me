@@ -223,12 +223,29 @@ async function completeSignature(tx, principal, c, record, { source, doc, signed
   });
   await recordAudit({ action: 'DIGITAL_SIGNATURE_COMPLETED', firmId: c.firmId, actorId: record.signerUserId, actorRole: record.signerRole, req, entityType: 'digital_signature', entityId: sig.id, meta: { caseId: c.id, provider: record.provider } }, tx);
   const events = [...stored.events, ['signature.completed', { firmId: c.firmId, caseId: c.id, role: record.signerRole, signatureId: sig.id, actorId: record.signerUserId }]];
+  if (isValuer) events.push(...(await autoRelease(tx, principal, c.id, doc.id, stored.version.id, req)));
   if (!isValuer) {
     const fresh = await tx.valuationCase.findUnique({ where: { id: c.id }, include: { bank: true } });
     const t = await transition(tx, null, fresh, 'CLIENT_SIGNATURE_COMPLETED', { system: true, documentVersionId: stored.version.id, req });
     events.push(...t.events);
   }
   return events;
+}
+
+/**
+ * Senior → client hand-over: once the valuer has signed, the report goes straight to the client for review and
+ * acceptance when the lender needs client approval, the client has an active portal login and the firm has not
+ * switched off workflowOptions.autoReleaseToClient. Otherwise the senior reviewer / Firm Admin releases it manually.
+ */
+async function autoRelease(tx, principal, caseId, documentId, documentVersionId, req) {
+  const c = await tx.valuationCase.findUnique({ where: { id: caseId }, include: { bank: true, client: { select: { userId: true, status: true } } } });
+  const settings = await tx.organizationSettings.findUnique({ where: { firmId: c.firmId }, select: { workflowOptions: true } });
+  if (c.status !== STATUS.FINAL_APPROVED || !c.bank.requiresClientApproval) return [];
+  if ((settings?.workflowOptions?.autoReleaseToClient ?? true) === false) return [];
+  if (!c.client.userId || c.client.status !== 'ACTIVE') return [];
+  await tx.caseDocument.update({ where: { id: documentId }, data: { visibility: 'CLIENT' } });
+  const t = await transition(tx, principal, c, 'RELEASE_TO_CLIENT', { system: true, req, documentVersionId, meta: { automatic: true } });
+  return t.events;
 }
 
 /** Releases the valuer-signed final report to the client portal. */

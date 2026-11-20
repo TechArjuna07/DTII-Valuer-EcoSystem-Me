@@ -27,7 +27,9 @@ router.post('/cases/:id/valuations/:stage/versions', ...staff, validate({ params
 router.post('/cases/:id/valuations/:stage/attachments', ...staff, limiters.upload, validate({ params: stageParam }), singleFile('file'), async (req, res) =>
   res.status(201).json(await svc.attachReport(req.principal, req.valid.params.id, STAGE[req.valid.params.stage], req.file, req)),
 );
-router.post('/cases/:id/valuations/preliminary/submit', ...staff, validate({ params: caseParam }), async (req, res) => res.json(await svc.submitPreliminary(req.principal, req.valid.params.id, req)));
+router.post('/cases/:id/valuations/preliminary/submit', ...staff, validate({ params: caseParam, body: z.strictObject({ nextAssigneeId: z.uuid().optional() }) }), async (req, res) =>
+  res.json(await svc.submitPreliminary(req.principal, req.valid.params.id, req, req.valid.body)),
+);
 router.post('/cases/:id/valuations/review', ...staff, validate({ params: caseParam, body: z.strictObject({ decision: z.enum(['APPROVED', 'RETURNED', 'REJECTED']), comments: opt(str(3000)) }) }), async (req, res) =>
   res.json(await svc.review(req.principal, req.valid.params.id, req.valid.body, req)),
 );

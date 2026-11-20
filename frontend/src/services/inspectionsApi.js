@@ -14,6 +14,6 @@ export const inspectionsApi = {
     return api.upload(`/cases/${caseId}/inspection/photos`, fd, onProgress);
   },
   removePhoto: (caseId, photoId) => api.post(`/cases/${caseId}/inspection/photos/${photoId}/remove`),
-  submit: (caseId) => api.post(`/cases/${caseId}/inspection/submit`),
+  submit: (caseId, nextAssigneeId) => api.post(`/cases/${caseId}/inspection/submit`, nextAssigneeId ? { nextAssigneeId } : {}),
   mine: () => api.get('/inspections/mine'),
 };

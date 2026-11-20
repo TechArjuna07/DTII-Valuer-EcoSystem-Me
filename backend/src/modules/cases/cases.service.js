@@ -135,6 +135,7 @@ async function get(principal, id) {
     repositoryLabel: `${c.caseNumber}_${c.bank.shortCode}`,
     pipeline: PIPELINE,
     allowedActions: allowedActions(principal, { ...c, bank: c.bank }, assignments),
+    handoverStages: isClient ? [] : handoverStages(principal, c, assignments),
   };
 }
 
@@ -238,10 +239,42 @@ async function assignInTx(tx, principal, c, stage, employeeId, req) {
 
 const STAGE_PERMISSION = { MARKETING: 'case.assign.field', FIELD: 'case.assign.field', JUNIOR: 'case.assign.reviewer', SENIOR: 'case.assign.reviewer' };
 
+/**
+ * Hand-over: while a stage is still unassigned, the assignee of the PREVIOUS stage may pick its employee
+ * (field officer → junior reviewer, junior reviewer → senior reviewer). Reassigning an existing reviewer stays
+ * with the Firm Admin (case.assign.reviewer).
+ */
+const HANDOVER_FROM = Object.freeze({ JUNIOR: 'FIELD', SENIOR: 'JUNIOR' });
+
+function handoverStages(principal, c, assignments) {
+  if (!principal.employeeId || TERMINAL.includes(c.status)) return [];
+  return Object.entries(HANDOVER_FROM)
+    .filter(([stage, from]) => !assignments.some((a) => a.stage === stage) && assignments.some((a) => a.stage === from && a.employeeId === principal.employeeId))
+    .map(([stage]) => stage);
+}
+
+const mayAssign = (principal, c, assignments, stage) => hasPermission(principal, STAGE_PERMISSION[stage]) || handoverStages(principal, c, assignments).includes(stage);
+
+/**
+ * Assigns the next stage as part of a hand-over (inspection / preliminary submission), inside the caller's
+ * transaction on a LOCKED case. Picking the person already assigned is a no-op; replacing a different one is
+ * refused (only the Firm Admin reassigns).
+ */
+async function handOverInTx(tx, principal, c, stage, employeeId, req) {
+  if (!employeeId) return [];
+  const current = await tx.caseAssignment.findFirst({ where: { caseId: c.id, stage, endedAt: null } });
+  if (current?.employeeId === employeeId) return [];
+  if (current) throw Conflict(`A ${STAGE_ROLE[stage].replaceAll('_', ' ').toLowerCase()} is already assigned; ask the Firm Admin to change it`);
+  return assignInTx(tx, principal, c, stage, employeeId, req);
+}
+
 async function assign(principal, id, { stage, employeeId }, req) {
-  if (!hasPermission(principal, STAGE_PERMISSION[stage])) throw Forbidden();
   await findVisibleCase(principal, id);
-  const events = await prisma.$transaction(async (tx) => assignInTx(tx, principal, await lockCase(tx, principal.firmId, id), stage, employeeId, req));
+  const events = await prisma.$transaction(async (tx) => {
+    const c = await lockCase(tx, principal.firmId, id);
+    if (!mayAssign(principal, c, await activeAssignments(tx, id), stage)) throw Forbidden();
+    return assignInTx(tx, principal, c, stage, employeeId, req);
+  });
   emitAll(events);
   return get(principal, id);
 }
@@ -280,15 +313,32 @@ async function timeline(principal, id) {
   };
 }
 
-/** Employees eligible for a stage (for assignment pickers), with their current open workload. */
-async function assignableEmployees(principal, stage) {
-  if (!hasPermission(principal, STAGE_PERMISSION[stage])) throw Forbidden();
-  const rows = await prisma.employeeProfile.findMany({
-    where: { firmId: principal.firmId, status: 'ACTIVE', deletedAt: null, user: { status: { in: ['ACTIVE', 'INVITED'] }, roles: { some: { firmId: principal.firmId, status: 'ACTIVE', role: { code: STAGE_ROLE[stage] } } } } },
-    select: { id: true, employeeCode: true, designation: true, user: { select: { fullName: true } }, _count: { select: { assignments: { where: { endedAt: null } } } } },
-    orderBy: { employeeCode: 'asc' },
-  });
-  return { items: rows.map((e) => ({ id: e.id, employeeCode: e.employeeCode, name: e.user.fullName, designation: e.designation, openAssignments: e._count.assignments })) };
+/**
+ * Employees eligible for a stage (for assignment pickers), with their current open workload.
+ * With caseId, the case's hand-over rules apply (so a field officer can pick the junior reviewer) and the
+ * case's junior reviewer is never offered as its senior reviewer (maker-checker).
+ */
+async function assignableEmployees(principal, stage, caseId) {
+  let exclude = [];
+  if (caseId) {
+    const c = await findVisibleCase(principal, caseId);
+    const assignments = await activeAssignments(prisma, caseId);
+    if (!mayAssign(principal, c, assignments, stage)) throw Forbidden();
+    const other = { JUNIOR: 'SENIOR', SENIOR: 'JUNIOR' }[stage];
+    exclude = assignments.filter((a) => a.stage === other).map((a) => a.employeeId);
+  } else if (!hasPermission(principal, STAGE_PERMISSION[stage])) throw Forbidden();
+  const [rows, settings] = await Promise.all([
+    prisma.employeeProfile.findMany({
+      where: { firmId: principal.firmId, status: 'ACTIVE', deletedAt: null, id: { notIn: exclude }, user: { status: { in: ['ACTIVE', 'INVITED'] }, roles: { some: { firmId: principal.firmId, status: 'ACTIVE', role: { code: STAGE_ROLE[stage] } } } } },
+      select: { id: true, employeeCode: true, designation: true, user: { select: { fullName: true } }, _count: { select: { assignments: { where: { endedAt: null } } } } },
+      orderBy: { employeeCode: 'asc' },
+    }),
+    prisma.organizationSettings.findUnique({ where: { firmId: principal.firmId }, select: { workflowOptions: true } }),
+  ]);
+  return {
+    items: rows.map((e) => ({ id: e.id, employeeCode: e.employeeCode, name: e.user.fullName, designation: e.designation, openAssignments: e._count.assignments })),
+    autoAssign: settings?.workflowOptions?.autoAssign ?? 'MANUAL',
+  };
 }
 
-export { list, get, create, update, assign, runGenericTransition, timeline, assignableEmployees, nextCaseNumber, isOverdueNow, emitAll, listInclude, toListItem };
+export { list, get, create, update, assign, handOverInTx, runGenericTransition, timeline, assignableEmployees, nextCaseNumber, isOverdueNow, emitAll, listInclude, toListItem };

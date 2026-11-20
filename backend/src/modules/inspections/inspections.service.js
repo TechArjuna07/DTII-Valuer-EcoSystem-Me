@@ -6,6 +6,7 @@ import { emit } from '../../services/events.js';
 import { findVisibleCase } from '../cases/case-access.js';
 import { STATUS, TERMINAL } from '../workflow/workflow.definition.js';
 import { lockCase, recordActivity, transition } from '../workflow/workflow.service.js';
+import { handOverInTx } from '../cases/cases.service.js';
 import { storeVersion } from '../documents/documents.service.js';
 import { FileValidationError, validateFile } from '../documents/file-validator.js';
 import { DEFAULT_WORKFLOW } from '../masters/masters.service.js';
@@ -237,8 +238,12 @@ async function removePhoto(principal, caseId, photoId, req) {
   return getInspection(principal, caseId);
 }
 
-/** Submits the inspection report after the server-side readiness checks; the case moves to INSPECTION_COMPLETED. */
-async function submit(principal, caseId, req) {
+/**
+ * Submits the inspection report after the server-side readiness checks; the case moves to INSPECTION_COMPLETED.
+ * nextAssigneeId (optional) hands the case over to that junior reviewer; otherwise the firm's auto-assignment
+ * (if enabled) or the Firm Admin picks one.
+ */
+async function submit(principal, caseId, req, { nextAssigneeId } = {}) {
   const c0 = await findVisibleCase(principal, caseId, prisma, { category: true });
   await assertFieldOfficer(principal, c0);
   const [fields, details, minPhotos] = await Promise.all([categoryFields(c0.categoryId), prisma.propertyDetails.findUnique({ where: { caseId } }), minPhotosFor(c0.firmId)]);
@@ -250,8 +255,9 @@ async function submit(principal, caseId, req) {
     const r = readiness(round, photos, minPhotos, missingRequired(fields, details?.data));
     if (!r.ready) throw BadRequest(r.checks.filter((x) => !x.ok).map((x) => (x.detail ? `${x.label} (${x.detail})` : x.label)));
     await tx.propertyInspection.update({ where: { id: round.id }, data: { status: 'SUBMITTED', submittedAt: new Date(), inspectedAt: round.inspectedAt ?? round.startedAt ?? new Date() } });
+    const handover = await handOverInTx(tx, principal, c, 'JUNIOR', nextAssigneeId, req);
     const t = await transition(tx, principal, c, 'SUBMIT_INSPECTION', { req, meta: { round: round.round, photos } });
-    return t.events;
+    return [...handover, ...t.events];
   });
   emitAll(events);
   return getInspection(principal, caseId);

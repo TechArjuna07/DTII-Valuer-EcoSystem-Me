@@ -29,7 +29,7 @@ const caseInfo = (caseId) => prisma.valuationCase.findUnique({ where: { id: case
 /** to-status → { who, title, body(c), tab } */
 const ON_STATUS = {
   INSPECTION_COMPLETED: { who: ['ADMINS', 'JUNIOR'], title: 'Inspection completed', body: (c) => `The site inspection for ${c.caseNumber} (${c.client.name}) is complete. The preliminary valuation can start.`, tab: 'inspection' },
-  PRELIMINARY_SUBMITTED: { who: ['SENIOR'], title: 'Senior review pending', body: (c) => `The preliminary valuation of ${c.caseNumber} has been submitted for your review.`, tab: 'senior' },
+  PRELIMINARY_SUBMITTED: { who: ['SENIOR'], unassignedFallback: 'SENIOR', title: 'Senior review pending', body: (c) => `The preliminary valuation of ${c.caseNumber} has been submitted for your review.`, tab: 'senior' },
   SENT_BACK_FOR_CORRECTION: { who: ['JUNIOR'], title: 'Valuation returned for correction', body: (c) => `The senior reviewer returned ${c.caseNumber} for correction.`, tab: 'preliminary' },
   FINAL_APPROVED: { who: ['ADMINS', 'MARKETING', 'SENIOR'], title: 'Final report approved', body: (c) => `The final valuation report of ${c.caseNumber} is approved and awaits the valuer's signature.`, tab: 'approval' },
   CLIENT_APPROVAL_PENDING: { who: ['CLIENT'], title: 'Your valuation report is ready for review', body: (c) => `Please review the valuation report ${c.caseNumber}, then approve it or raise a query.`, tab: 'approval' },
@@ -92,6 +92,12 @@ function registerNotificationRules() {
     const c = await caseInfo(caseId);
     const ids = (await resolve(firmId, caseId, rule.who)).filter((id) => id !== actorId);
     await notify({ firmId, recipientIds: ids, event: to, caseId, title: rule.title, body: rule.body(c), link: `/cases/${caseId}?tab=${rule.tab}`, dedupe: `${caseId}:${c.statusChangedAt.toISOString()}` });
+    // Nobody holds the next stage (manual assignment and no hand-over pick): ask the Firm Admins to assign one.
+    const stage = rule.unassignedFallback;
+    if (stage && (await stageUsers(caseId, stage)).length === 0) {
+      const role = { JUNIOR: 'junior', SENIOR: 'senior' }[stage];
+      await notify({ firmId, recipientIds: await firmAdmins(firmId), event: `${stage}_UNASSIGNED`, caseId, title: `Assign a ${role} reviewer`, body: `${c.caseNumber} is waiting for a ${role} reviewer.`, link: `/cases/${caseId}`, dedupe: `${caseId}:${stage}:${c.statusChangedAt.toISOString()}` });
+    }
   });
 
   on('document.requested', async ({ firmId, caseId, requestId, requestedFrom }) => {

@@ -8,7 +8,7 @@ export const valuationsApi = {
     fd.append('file', file);
     return api.upload(`/cases/${caseId}/valuations/${stage}/attachments`, fd);
   },
-  submitPreliminary: (caseId) => api.post(`/cases/${caseId}/valuations/preliminary/submit`),
+  submitPreliminary: (caseId, nextAssigneeId) => api.post(`/cases/${caseId}/valuations/preliminary/submit`, nextAssigneeId ? { nextAssigneeId } : {}),
   review: (caseId, decision, comments) => api.post(`/cases/${caseId}/valuations/review`, { decision, ...(comments ? { comments } : {}) }),
   approveFinal: (caseId, comments) => api.post(`/cases/${caseId}/valuations/final/approve`, comments ? { comments } : {}),
 };

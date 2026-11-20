@@ -11,6 +11,7 @@ import { htmlToPdf, rendererAvailable } from '../../services/pdf/pdf-renderer.js
 import { findVisibleCase } from '../cases/case-access.js';
 import { STATUS } from '../workflow/workflow.definition.js';
 import { activeAssignments, lockCase, recordActivity, transition } from '../workflow/workflow.service.js';
+import { handOverInTx } from '../cases/cases.service.js';
 import { storeVersion } from '../documents/documents.service.js';
 import { FileValidationError, validateFile } from '../documents/file-validator.js';
 import { calculate } from './engines/index.js';
@@ -281,7 +282,8 @@ async function attachReport(principal, caseId, stage, file, req) {
   return createVersion(principal, caseId, stage, { inputs: current.inputs, summary: current.summary, changeNote: 'Report PDF uploaded by valuer' }, req, content);
 }
 
-async function submitPreliminary(principal, caseId, req) {
+/** Submits the preliminary valuation; nextAssigneeId (optional) hands the case over to that senior reviewer. */
+async function submitPreliminary(principal, caseId, req, { nextAssigneeId } = {}) {
   await findVisibleCase(principal, caseId);
   const events = await prisma.$transaction(async (tx) => {
     const c = await lockCase(tx, principal.firmId, caseId);
@@ -289,9 +291,10 @@ async function submitPreliminary(principal, caseId, req) {
     if (!report?.currentVersionId) throw Conflict('Prepare the preliminary valuation first');
     const current = await tx.valuationReportVersion.findUnique({ where: { id: report.currentVersionId } });
     if (!current.documentVersionId) throw Conflict('The current version has no report PDF; attach one before submitting');
+    const handover = await handOverInTx(tx, principal, c, 'SENIOR', nextAssigneeId, req);
     const t = await transition(tx, principal, c, 'SUBMIT_PRELIMINARY', { req, documentVersionId: current.documentVersionId, meta: { version: current.version, marketValue: Number(current.marketValue) } });
     await tx.valuationReport.update({ where: { id: report.id }, data: { status: 'SUBMITTED' } });
-    return t.events;
+    return [...handover, ...t.events];
   });
   emitAll(events);
   return getValuations(principal, caseId);

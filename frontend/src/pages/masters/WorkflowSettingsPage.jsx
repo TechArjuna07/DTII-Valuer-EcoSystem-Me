@@ -74,10 +74,12 @@ export default function WorkflowSettingsPage() {
             <div className="space-y-1.5">
               <Label htmlFor="autoAssign">Reviewer assignment</Label>
               <NativeSelect id="autoAssign" value={options.autoAssign} onChange={(e) => setOptions({ ...options, autoAssign: e.target.value })}>
-                <option value="MANUAL">Manual (Firm Admin assigns)</option>
+                <option value="MANUAL">Manual: chosen at hand-over, otherwise by the Firm Admin</option>
                 <option value="LEAST_LOADED">Automatic: least-loaded reviewer</option>
               </NativeSelect>
-              <p className="text-xs text-muted-foreground">Automatic assignment never picks the junior reviewer of a case as its senior reviewer.</p>
+              <p className="text-xs text-muted-foreground">
+                The field officer picks the junior reviewer when submitting the inspection, and the junior picks the senior when submitting the preliminary valuation. Without a pick, automatic mode assigns the least-loaded reviewer. The junior reviewer of a case is never its senior reviewer.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="minPhotos">Minimum inspection photographs</Label>
@@ -86,6 +88,10 @@ export default function WorkflowSettingsPage() {
             <label className="flex items-start gap-3">
               <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={options.requireSourceDocument} onChange={(e) => setOptions({ ...options, requireSourceDocument: e.target.checked })} />
               <span className="text-sm">Require at least one source document before a field officer can be assigned</span>
+            </label>
+            <label className="flex items-start gap-3">
+              <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={options.autoReleaseToClient !== false} onChange={(e) => setOptions({ ...options, autoReleaseToClient: e.target.checked })} />
+              <span className="text-sm">Send the report to the client for review and acceptance as soon as the valuer signs it (when the lender needs client approval and the client has a portal login)</span>
             </label>
             <Button loading={save.isPending} onClick={() => save.mutate()}>
               Save settings

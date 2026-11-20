@@ -46,10 +46,29 @@ describe('valuer signature & release', () => {
     expect(pdf).toContain('%PDF-');
     expect((await as(fx.sr.token).post(`/cases/${c.id}/signatures/valuer`, { password: PASSWORD, consent: true })).status).toBe(403); // once only
 
-    const released = await as(fx.sr.token).post(`/cases/${c.id}/approval/release`);
-    expect(released.body.caseStatus).toBe('CLIENT_APPROVAL_PENDING');
+    // Senior → client hand-over is automatic once the valuer has signed (client has a portal login).
+    expect(signed.body.caseStatus).toBe('CLIENT_APPROVAL_PENDING');
+    const released = (await as(fx.admin).get(`/cases/${c.id}/timeline`)).body.items.find((i) => i.action === 'RELEASE_TO_CLIENT');
+    expect(released).toMatchObject({ actorRole: 'SYSTEM', meta: { automatic: true } });
     const after = await as(fx.client.token).get(`/cases/${c.id}/documents`);
     expect(after.body.folders.find((f) => f.code === 'FINAL_VALUATION_REPORT').documents).toHaveLength(1);
+  }, 120_000);
+});
+
+describe('manual release when auto-release is switched off', () => {
+  test('the senior reviewer releases the signed report explicitly', async () => {
+    const settings = (await as(fx.admin).get('/masters/workflow-settings')).body;
+    expect(settings.options.autoReleaseToClient).toBe(true);
+    await as(fx.admin).put('/masters/workflow-settings', { options: { ...settings.options, autoReleaseToClient: false } });
+    try {
+      const c = await approvedCase();
+      const signed = await as(fx.sr.token).post(`/cases/${c.id}/signatures/valuer`, { password: PASSWORD, consent: true });
+      expect(signed.body.caseStatus).toBe('FINAL_APPROVED');
+      expect(signed.body.permissions.canRelease).toBe(true);
+      expect((await as(fx.sr.token).post(`/cases/${c.id}/approval/release`)).body.caseStatus).toBe('CLIENT_APPROVAL_PENDING');
+    } finally {
+      await as(fx.admin).put('/masters/workflow-settings', { options: settings.options });
+    }
   }, 120_000);
 });
 

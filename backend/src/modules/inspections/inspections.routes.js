@@ -79,7 +79,9 @@ router.post('/cases/:id/inspection/photos', ...staff, limiters.upload, validate(
 router.post('/cases/:id/inspection/photos/:photoId/remove', ...staff, validate({ params: z.strictObject({ id: z.uuid(), photoId: z.uuid() }) }), async (req, res) =>
   res.json(await svc.removePhoto(req.principal, req.valid.params.id, req.valid.params.photoId, req)),
 );
-router.post('/cases/:id/inspection/submit', ...staff, validate({ params: caseParam }), async (req, res) => res.json(await svc.submit(req.principal, req.valid.params.id, req)));
+router.post('/cases/:id/inspection/submit', ...staff, validate({ params: caseParam, body: z.strictObject({ nextAssigneeId: z.uuid().optional() }) }), async (req, res) =>
+  res.json(await svc.submit(req.principal, req.valid.params.id, req, req.valid.body)),
+);
 router.get('/inspections/mine', authenticate, requireFirmContext, requirePermission('inspection.perform'), async (req, res) => res.json(await svc.myInspections(req.principal)));
 
 const tag = 'Inspections';

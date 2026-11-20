@@ -36,8 +36,8 @@ export const uploadPhoto = (token, caseId, kind = 'PROPERTY') =>
 
 export const LAND_PROPERTY = { propertyType: 'Industrial Building', ownerName: 'ABC Industries Pvt Ltd', landArea: 12000, landAreaUnit: 'sq.ft', builtUpArea: 8000, yearOfConstruction: 2012 };
 
-/** Field officer completes and submits the inspection. */
-export async function completeInspection(fx, caseId) {
+/** Field officer completes and submits the inspection (optionally handing over to a junior reviewer). */
+export async function completeInspection(fx, caseId, { nextAssigneeId } = {}) {
   const fo = as(fx.fo.token);
   await fo.post(`/cases/${caseId}/inspection/start`);
   await fo.put(`/cases/${caseId}/property`, { data: LAND_PROPERTY });
@@ -57,7 +57,7 @@ export async function completeInspection(fx, caseId) {
     landmarks: [{ name: 'Bhosari bus depot', distance: '500 m', direction: 'North' }],
   });
   for (const kind of ['PROPERTY', 'PROPERTY', 'LOCATION']) await uploadPhoto(fx.fo.token, caseId, kind);
-  return fo.post(`/cases/${caseId}/inspection/submit`);
+  return fo.post(`/cases/${caseId}/inspection/submit`, nextAssigneeId ? { nextAssigneeId } : {});
 }
 
 export const LB_INPUTS = {
@@ -67,12 +67,12 @@ export const LB_INPUTS = {
 };
 
 /** Junior reviewer prepares and submits the preliminary valuation (case must be INSPECTION_COMPLETED). */
-export async function completePreliminary(fx, caseId, inputs = LB_INPUTS) {
+export async function completePreliminary(fx, caseId, inputs = LB_INPUTS, { nextAssigneeId } = {}) {
   const jr = as(fx.jr.token);
   await jr.post(`/cases/${caseId}/transitions`, { action: 'START_PRELIMINARY' });
   const v = await jr.post(`/cases/${caseId}/valuations/preliminary/versions`, { inputs, summary: 'Preliminary assessment based on site inspection.' });
   if (v.status !== 201) throw new Error(`preliminary version failed: ${JSON.stringify(v.body)}`);
-  return jr.post(`/cases/${caseId}/valuations/preliminary/submit`);
+  return jr.post(`/cases/${caseId}/valuations/preliminary/submit`, nextAssigneeId ? { nextAssigneeId } : {});
 }
 
 /** Senior reviewer approves the preliminary, issues the final report and approves it (→ FINAL_APPROVED). */
@@ -85,10 +85,14 @@ export async function completeFinal(fx, caseId, { templateId } = {}) {
   return sr.post(`/cases/${caseId}/valuations/final/approve`, { comments: 'Approved for issue' });
 }
 
-/** Valuer signs the approved final report and releases it to the client (→ CLIENT_APPROVAL_PENDING). */
+/**
+ * Valuer signs the approved final report and it reaches the client (→ CLIENT_APPROVAL_PENDING): automatically
+ * on signing by default, or by an explicit release when the firm switched auto-release off.
+ */
 export async function signAndRelease(fx, caseId) {
   const s = await as(fx.sr.token).post(`/cases/${caseId}/signatures/valuer`, { password: PASSWORD, consent: true });
   if (s.status !== 200) throw new Error(`valuer signature failed: ${JSON.stringify(s.body)}`);
+  if (s.body.caseStatus === 'CLIENT_APPROVAL_PENDING') return s;
   return as(fx.sr.token).post(`/cases/${caseId}/approval/release`);
 }
 
