@@ -88,6 +88,10 @@ const PERMISSION_DEFINITIONS = [
   ['bank.submit', 'submissions', 'Record bank/NBFC submission and acknowledgement', [FA, MK]],
   ['loan.update', 'loans', 'Record loan sanction and disbursement', [FA, MK]],
 
+  // IGR Maharashtra eASR (government ready-reckoner rates, shared platform data)
+  ['asr.view', 'asr', 'Look up IGR Maharashtra eASR rates (ready reckoner)', [SA, ...STAFF]],
+  ['asr.manage', 'asr', 'Refresh cached eASR data and view fetch status', [SA], true],
+
   // Reports
   ['reports.view', 'reports', 'View dashboards and reports (scope limited by role)', STAFF],
 ].map(([code, module, description, roles, critical = false]) => ({ code, module, description, roles, isCritical: critical }));

@@ -1,4 +1,4 @@
-import { Archive, BarChart3, Building2, ClipboardCheck, FileCode2, Mail, CalendarRange, FileType2, FolderKanban, Layers, Landmark, LayoutDashboard, Route, ScrollText, Settings, ShieldCheck, UserRound, Users } from 'lucide-react';
+import { Archive, BarChart3, MapPinned, Building2, ClipboardCheck, FileCode2, Mail, CalendarRange, FileType2, FolderKanban, Layers, Landmark, LayoutDashboard, Route, ScrollText, Settings, ShieldCheck, UserRound, Users } from 'lucide-react';
 
 /**
  * Sidebar navigation. Items are shown by CONTEXT (platform / firm) and PERMISSION, so each role only sees
@@ -30,6 +30,7 @@ export const NAV = [
       { href: '/cases', label: 'Cases', icon: FolderKanban, context: 'FIRM', any: ['case.view', 'portal.access'] },
       { href: '/reports', label: 'Reports', icon: BarChart3, context: 'FIRM', any: ['reports.view'] },
       { href: '/repository', label: 'Document Repository', icon: Archive, context: 'FIRM', any: ['client.view', 'portal.access'] },
+      { href: '/asr', label: 'ASR Rates (IGR)', icon: MapPinned, any: ['asr.view'] },
     ],
   },
   {

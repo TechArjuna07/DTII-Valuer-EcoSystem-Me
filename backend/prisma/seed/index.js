@@ -1,5 +1,6 @@
 /**
- * Idempotent reference-data seed: roles, permissions, platform-default role permissions, financial years.
+ * Idempotent reference-data seed: roles, permissions, platform-default role permissions, financial years,
+ * masters and the IGR eASR district list.
  * Safe to run repeatedly (upserts). Runs with the runtime role (DATABASE_URL); no schema changes.
  *
  *   pnpm --filter @valuers/backend db:seed
@@ -9,6 +10,7 @@ import { PrismaClient } from '@prisma/client';
 import { ROLE_DEFINITIONS, PERMISSION_DEFINITIONS } from '../../src/config/rbac.js';
 import { fyFromStartYear, fyStartYear } from '../../src/utils/financial-year.js';
 import { seedMasters } from './masters.js';
+import { seedAsrDistricts } from './asr.js';
 
 /** First FY offered in masters; the seed also creates the next FY so April roll-over needs no manual step. */
 const FIRST_FY_START = 2024;
@@ -62,7 +64,7 @@ async function seedFinancialYears(prisma, today = new Date()) {
 }
 
 async function seedReferenceData(prisma) {
-  return { ...(await seedRbac(prisma)), ...(await seedFinancialYears(prisma)), ...(await seedMasters(prisma)) };
+  return { ...(await seedRbac(prisma)), ...(await seedFinancialYears(prisma)), ...(await seedMasters(prisma)), ...(await seedAsrDistricts(prisma)) };
 }
 
 async function main() {

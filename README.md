@@ -117,6 +117,19 @@ polling) inside the API process. In production run them separately:
 pnpm --filter @valuers/backend start:worker     # RUN_MODE=worker
 ```
 
+## IGR Maharashtra eASR rates
+
+The **ASR Rates (IGR)** page looks up government ready-reckoner rates (Annual Statement of Rates) by district → taluka →
+village, for urban zones, influence areas and rural land, with survey-number search.
+
+- eASR 2.0 has no public API: the platform reads its web pages the way a browser does (`backend/src/services/igr`).
+- Data is **platform-wide**: the first request for a village fetches it from IGR (background `igr` job, polled by the
+  page); every later request from any firm is served from our database (`asr_*` tables).
+- Polite by design: one statement at a time platform-wide, at most one request per `IGR_EASR_MIN_INTERVAL_MS`,
+  retries with back-off, failed fetches retried only after a cool-down. Current-year statements are refreshed after
+  `IGR_EASR_REFRESH_DAYS`; past years never change.
+- Diagnostic (reads live, stores nothing): `pnpm --filter @valuers/backend asr:probe -- Pune 58 295 --survey`
+
 ## Documentation
 
 These files are kept outside the repository (ask the project owner):

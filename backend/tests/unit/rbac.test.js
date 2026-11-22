@@ -13,7 +13,9 @@ describe('RBAC catalogue', () => {
   test('only Superadmin manages firms; Superadmin has no firm case access', () => {
     for (const p of PERMISSION_DEFINITIONS.filter((x) => x.code.startsWith('platform.'))) expect(p.roles).toEqual([ROLES.SUPER_ADMIN]);
     const saPerms = PERMISSION_DEFINITIONS.filter((p) => p.roles.includes(ROLES.SUPER_ADMIN)).map((p) => p.code);
-    expect(saPerms.every((c) => c.startsWith('platform.'))).toBe(true);
+    // Platform administration plus shared public reference data (IGR eASR rates) — never firm data.
+    expect(saPerms.every((c) => c.startsWith('platform.') || c.startsWith('asr.'))).toBe(true);
+    expect(saPerms.some((c) => /^(case|document|valuation|inspection|client|report)\./.test(c))).toBe(false);
   });
 
   test('maker-checker: preparing and approving valuations belong to different roles', () => {

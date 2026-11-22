@@ -1262,3 +1262,147 @@ model EmailLog {
   @@index([status])
   @@map("email_logs")
 }
+
+// ───────────────────────────── IGR Maharashtra eASR (Annual Statement of Rates) ─────────────────────────────
+// Platform-level reference data shared by every firm. Source: igreval.maharashtra.gov.in/eASR2.0 (WebForms pages,
+// fetched on first use and cached here). Government codes (gov_code) are the dropdown values of the eASR site.
+
+enum AsrAreaType {
+  URBAN /// zone-wise rates: open land, residential, office, shop, industrial (dg_Valuation2_0)
+  INFLUENCE /// land category ("location") → sub-zone rate (grdInfSublocationWiseRate)
+  RURAL /// vibhag number + assessment type / area range rates (ruralDataGrid)
+  NONE /// the village has no published rates for the year
+}
+
+enum AsrFetchStatus {
+  PENDING
+  FETCHING
+  READY
+  FAILED
+}
+
+/// District key as used by eASR (?hDistName=Pune). Seeded from the eASR map page.
+model AsrDistrict {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key              String    @unique @db.VarChar(40)
+  name             String    @db.VarChar(80)
+  govCode          Int?      @map("gov_code")
+  talukasFetchedAt DateTime? @map("talukas_fetched_at") @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  talukas AsrTaluka[]
+
+  @@map("asr_districts")
+}
+
+model AsrTaluka {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  districtId        String    @map("district_id") @db.Uuid
+  govCode           Int       @map("gov_code")
+  name              String    @db.VarChar(120)
+  villagesFetchedAt DateTime? @map("villages_fetched_at") @db.Timestamptz(3)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  district AsrDistrict  @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  villages AsrVillage[]
+
+  @@unique([districtId, govCode])
+  @@map("asr_talukas")
+}
+
+model AsrVillage {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  talukaId  String   @map("taluka_id") @db.Uuid
+  govCode   Int      @map("gov_code")
+  name      String   @db.VarChar(200)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  taluka   AsrTaluka    @relation(fields: [talukaId], references: [id], onDelete: Restrict)
+  rateSets AsrRateSet[]
+
+  @@unique([talukaId, govCode])
+  @@map("asr_villages")
+}
+
+/// eASR statement years (ddlYear: value 13 = "2026-2027").
+model AsrYear {
+  govCode   Int      @id @map("gov_code")
+  label     String   @unique @db.VarChar(20)
+  startYear Int      @map("start_year")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("asr_years")
+}
+
+/// All published rates of one village for one statement year (one fetch from eASR).
+model AsrRateSet {
+  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  villageId           String         @map("village_id") @db.Uuid
+  yearCode            Int            @map("year_code")
+  status              AsrFetchStatus @default(PENDING)
+  areaType            AsrAreaType?   @map("area_type")
+  vibhagNo            String?        @map("vibhag_no") @db.VarChar(40)
+  /// INFLUENCE only: land categories offered by eASR [{ code, name }]
+  locations           Json           @default("[]")
+  surveyNumbersStatus AsrFetchStatus @default(PENDING) @map("survey_numbers_status")
+  fetchedAt           DateTime?      @map("fetched_at") @db.Timestamptz(3)
+  requestedAt         DateTime       @default(now()) @map("requested_at") @db.Timestamptz(3)
+  attempts            Int            @default(0)
+  lastError           String?        @map("last_error") @db.VarChar(500)
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  village AsrVillage @relation(fields: [villageId], references: [id], onDelete: Restrict)
+  rates   AsrRate[]
+
+  @@unique([villageId, yearCode])
+  @@index([status])
+  @@map("asr_rate_sets")
+}
+
+/// One row of an eASR rate grid. Columns used depend on the rate set's area type.
+model AsrRate {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rateSetId            String   @map("rate_set_id") @db.Uuid
+  seq                  Int
+  locationCode         Int?     @map("location_code")
+  locationName         String?  @map("location_name") @db.VarChar(300)
+  zoneCode             String?  @map("zone_code") @db.VarChar(60)
+  zoneName             String?  @map("zone_name") @db.VarChar(600)
+  openLand             Decimal? @map("open_land") @db.Decimal(16, 2)
+  residential          Decimal? @db.Decimal(16, 2)
+  office               Decimal? @db.Decimal(16, 2)
+  shop                 Decimal? @db.Decimal(16, 2)
+  industrial           Decimal? @db.Decimal(16, 2)
+  rate                 Decimal? @db.Decimal(16, 2)
+  assessmentType       String?  @map("assessment_type") @db.VarChar(200)
+  assessmentRange      String?  @map("assessment_range") @db.VarChar(100)
+  unit                 String?  @db.VarChar(40)
+  unitCode             String?  @map("unit_code") @db.VarChar(20)
+  /// eASR grid page / row (the "SurveyNo" postback target); null for rows without survey numbers
+  gridPage             Int?     @map("grid_page")
+  gridRow              Int?     @map("grid_row")
+  surveyNumbers        String[] @default([]) @map("survey_numbers")
+  surveyNumbersFetched Boolean  @default(false) @map("survey_numbers_fetched")
+
+  rateSet AsrRateSet @relation(fields: [rateSetId], references: [id], onDelete: Cascade)
+
+  @@unique([rateSetId, seq])
+  @@map("asr_rates")
+}
+
+/// Every eASR fetch (for monitoring the government site and our request volume).
+model AsrFetchLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind       String   @db.VarChar(30)
+  target     String   @db.VarChar(200)
+  rateSetId  String?  @map("rate_set_id") @db.Uuid
+  ok         Boolean
+  requests   Int      @default(0)
+  durationMs Int      @map("duration_ms")
+  error      String?  @db.VarChar(500)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([createdAt(sort: Desc)])
+  @@map("asr_fetch_logs")
+}

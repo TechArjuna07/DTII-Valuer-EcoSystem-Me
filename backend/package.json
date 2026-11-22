@@ -24,7 +24,8 @@
     "dev:worker": "node --watch src/worker.js",
     "db:reset-dev": "node scripts/reset-dev-data.js",
     "mail:test": "node scripts/test-mail.js",
-    "cases:complete-disbursed": "node scripts/complete-disbursed-cases.js"
+    "cases:complete-disbursed": "node scripts/complete-disbursed-cases.js",
+    "asr:probe": "node scripts/easr-probe.js"
   },
   "prisma": {
     "seed": "node prisma/seed/index.js"
@@ -35,6 +36,7 @@
     "@prisma/client": "6.19.3",
     "argon2": "^0.41.1",
     "bullmq": "^5.34.0",
+    "cheerio": "^1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

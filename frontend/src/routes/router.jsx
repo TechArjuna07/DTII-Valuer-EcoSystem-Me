@@ -82,6 +82,8 @@ export const router = createBrowserRouter([
                   { path: '/reports', element: L(() => import('@/pages/reports/ReportsPage')) },
                 ],
               },
+              // IGR eASR rates: firm staff and the Superadmin (shared platform data)
+              { element: <RequireAuth permissions={['asr.view']} />, children: [{ path: '/asr', element: L(() => import('@/pages/asr/AsrRatesPage')) }] },
               { element: <RequireAuth context="FIRM" permissions={['firm.smtp.manage']} />, children: [{ path: '/email-settings', element: L(() => import('@/pages/admin/EmailSettingsPage')) }] },
 
               // Superadmin (platform context)
