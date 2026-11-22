@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/data/StatusBadge';
 import { ErrorState } from '@/components/data/States';
 import { FormAlert } from '@/components/forms/FormAlert';
 import { FirmFields, firmDefaults, firmFieldsSchema } from '@/components/forms/FirmFields';
+import { ReportSettingsCard } from '@/components/forms/ReportSettingsCard';
 import { formatDate } from '@/utils/format';
 import { emptyToNull } from '@/utils/validation';
 
@@ -42,7 +43,7 @@ export default function FirmProfilePage() {
 
   return (
     <>
-      <PageHeader title="Firm profile" description="Shown on emails and, later, on valuation reports." />
+      <PageHeader title="Firm profile" description="Shown on emails and on valuation reports." />
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -84,6 +85,7 @@ export default function FirmProfilePage() {
           </CardContent>
         </Card>
       </div>
+      <ReportSettingsCard />
     </>
   );
 }

@@ -101,6 +101,13 @@ export function FlatInputs({ v, set, disabled }) {
         </div>
       </Section>
 
+      <Section title="Proforma invoice (first page of the final report)">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Num label="Valuation charges (₹, before GST)" value={v.invoice?.fee} onChange={(x) => set(['invoice', 'fee'], x === '' ? undefined : x)} disabled={disabled} hint="Leave blank for no invoice page" />
+          <Text label="Bank officer name" value={v.invoice?.bankOfficer} onChange={(x) => set(['invoice', 'bankOfficer'], x)} disabled={disabled} placeholder="e.g. Mr. Yogesh" />
+        </div>
+      </Section>
+
       <Section title="Report particulars (section I & declaration)">
         <div className="grid gap-3 sm:grid-cols-3">
           <Text label="Purpose of valuation" value={r.purpose} onChange={setR('purpose')} disabled={disabled} placeholder="To avail Housing Loan" />

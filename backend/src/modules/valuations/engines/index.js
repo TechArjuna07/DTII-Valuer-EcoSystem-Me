@@ -189,6 +189,8 @@ const flatInputs = z.strictObject({
   readyReckonerValue: n().optional(),
   roundTo: z.coerce.number().int().min(1).max(1_000_000).default(1),
   report: flatReport,
+  /** Proforma invoice printed as the first page of the report when a fee is entered. */
+  invoice: z.strictObject({ fee: n(1e8).optional(), bankOfficer: text(120) }).default({}),
 });
 
 /**

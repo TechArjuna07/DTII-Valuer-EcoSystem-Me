@@ -40,7 +40,7 @@ function getBrowser() {
 }
 
 /** @returns {Promise<Buffer>} A4 PDF */
-async function htmlToPdf(html, { footerText = '' } = {}) {
+async function htmlToPdf(html, { footerText = '', headerText = '', pageTotal = true } = {}) {
   if (!executablePath) throw new Error('PDF renderer is not available (set CHROME_PATH or PDF_RENDERER=chrome)');
   const browser = await getBrowser();
   const page = await browser.newPage();
@@ -54,8 +54,8 @@ async function htmlToPdf(html, { footerText = '' } = {}) {
       printBackground: true,
       margin: { top: '14mm', bottom: '16mm', left: '12mm', right: '12mm' },
       displayHeaderFooter: true,
-      headerTemplate: '<span></span>',
-      footerTemplate: `<div style="font-size:7px;width:100%;padding:0 12mm;color:#5b667a;display:flex;justify-content:space-between"><span>${footerText.replace(/[<>&"]/g, '')}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
+      headerTemplate: headerText ? `<div style="font-size:8px;width:100%;padding:0 12mm;color:#333;text-align:right">${headerText.replace(/[<>&"]/g, '')}</div>` : '<span></span>',
+      footerTemplate: `<div style="font-size:7px;width:100%;padding:0 12mm;color:#5b667a;display:flex;justify-content:space-between"><span>${footerText.replace(/[<>&"]/g, '')}</span><span>Page <span class="pageNumber"></span>${pageTotal ? ' of <span class="totalPages"></span>' : ''}</span></div>`,
       timeout: 60_000,
     });
     return Buffer.from(pdf);

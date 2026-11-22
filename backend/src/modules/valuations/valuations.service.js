@@ -17,6 +17,10 @@ import { FileValidationError, validateFile } from '../documents/file-validator.j
 import { calculate } from './engines/index.js';
 import { buildReportContext, compileTemplate } from './report-context.js';
 import { DEFAULT_TEMPLATE } from './templates/default-report.js';
+import { FLAT_SBI_TEMPLATE } from './templates/flat-sbi.js';
+import { buildFlatContext } from './report-flat.js';
+import { appendAnnexures } from '../../services/pdf/annexures.js';
+import { getBuffer } from '../../services/storage/storage.service.js';
 import { resolveForCase } from './templates.service.js';
 
 /**
@@ -179,9 +183,36 @@ async function peopleFor(c, assignments) {
 }
 
 /** Renders the PDF for a version (null when no renderer is configured; the valuer can upload a PDF instead). */
+/** Document types appended to the bank-format flat report, in this order. */
+const ANNEXURE_TYPES = ['LOCATION_MAP', 'READY_RECKONER_EVIDENCE', 'MARKET_COMPARABLES'];
+const ANNEXURE_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
+
+async function annexuresFor(c) {
+  const types = await prisma.documentType.findMany({ where: { code: { in: ANNEXURE_TYPES }, OR: [{ firmId: null }, { firmId: c.firmId }] }, select: { id: true, code: true, name: true } });
+  const typeOf = new Map(types.map((t) => [t.id, t]));
+  const docs = await prisma.caseDocument.findMany({ where: { caseId: c.id, archivedAt: null, currentVersionId: { not: null }, documentTypeId: { in: [...typeOf.keys()] } }, orderBy: { createdAt: 'asc' } });
+  const rank = (d) => ANNEXURE_TYPES.indexOf(typeOf.get(d.documentTypeId).code);
+  docs.sort((a, b) => rank(a) - rank(b));
+  const out = [];
+  for (const d of docs) {
+    const v = await prisma.documentVersion.findUnique({ where: { id: d.currentVersionId } });
+    if (!v || !ANNEXURE_MIME.includes(v.mimeType) || ['INFECTED', 'PENDING', 'ERROR'].includes(v.scanStatus)) continue;
+    out.push({ title: typeOf.get(d.documentTypeId).name.replace(/ \(annexure\)$/, ''), mimeType: v.mimeType, buffer: await getBuffer(v.storageKey) });
+  }
+  return out;
+}
+
 async function renderPdf({ c, stage, version, calc, summary, verificationCode, templateVersion, assignments }) {
   if (!rendererAvailable()) return null;
   const src = await sourceData(c);
+  if (c.category.engine === 'FLAT' && !templateVersion) {
+    // Bank (SBI / IBA) flat format; the proforma invoice and annexures belong to the final report only.
+    const flatCalc = stage === 'FINAL' ? calc : { ...calc, inputs: { ...calc.inputs, invoice: {} } };
+    const context = await buildFlatContext({ c, src, calc: flatCalc, stage, version, summary, people: await peopleFor(c, assignments), verificationCode });
+    const headerText = `Ref.No- ${c.caseNumber}${stage === 'FINAL' ? '' : ' (PRELIMINARY)'}`;
+    const pdf = await htmlToPdf(compileTemplate(FLAT_SBI_TEMPLATE)(context), { headerText, pageTotal: false, footerText: `${stage === 'FINAL' ? 'Valuation report' : 'Preliminary valuation'} v${version}` });
+    return stage === 'FINAL' ? appendAnnexures(pdf, await annexuresFor(c), { headerText }) : pdf;
+  }
   const context = await buildReportContext({ c, propertyFields: src.fields, propertyData: src.data, inspection: src.inspection, calc, stage, version, summary, people: await peopleFor(c, assignments), verificationCode });
   const html = compileTemplate(templateVersion?.bodyHtml ?? DEFAULT_TEMPLATE)(context);
   return htmlToPdf(html, { footerText: `${c.caseNumber} · ${stage === 'FINAL' ? 'Valuation report' : 'Preliminary valuation'} v${version}` });
