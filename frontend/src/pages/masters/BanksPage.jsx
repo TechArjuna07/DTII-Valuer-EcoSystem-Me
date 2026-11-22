@@ -38,7 +38,6 @@ const schema = z.object({
   email: optionalText(254, emailField),
   phone: optionalText(20, phoneField),
   address: optionalText(400),
-  requiresClientApproval: z.boolean(),
   status: z.enum(['ACTIVE', 'INACTIVE']),
 });
 
@@ -48,8 +47,8 @@ function BankDialog({ bank, onClose }) {
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: bank
-      ? Object.fromEntries(Object.keys(schema.shape).map((k) => [k, bank[k] ?? (k === 'requiresClientApproval' ? true : '')]))
-      : { institutionType: 'BANK', name: '', shortCode: '', branch: '', ifsc: '', contactPerson: '', email: '', phone: '', address: '', requiresClientApproval: true, status: 'ACTIVE' },
+      ? Object.fromEntries(Object.keys(schema.shape).map((k) => [k, bank[k] ?? '']))
+      : { institutionType: 'BANK', name: '', shortCode: '', branch: '', ifsc: '', contactPerson: '', email: '', phone: '', address: '', status: 'ACTIVE' },
   });
   const { errors, isSubmitting } = form.formState;
   const onSubmit = form.handleSubmit(async (v) => {
@@ -96,13 +95,6 @@ function BankDialog({ bank, onClose }) {
           <Field label="Address" htmlFor="bank-address">
             <Textarea id="bank-address" maxLength={400} {...form.register('address')} />
           </Field>
-          <label className="flex items-start gap-3 rounded-lg border p-3">
-            <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" {...form.register('requiresClientApproval')} />
-            <span>
-              <span className="block text-sm font-medium">Requires client approval and signature</span>
-              <span className="block text-xs text-muted-foreground">If off, the final report can go to this lender straight after senior approval.</span>
-            </span>
-          </label>
           {bank && (
             <Field label="Status" htmlFor="bank-status">
               <NativeSelect id="bank-status" {...form.register('status')}>
@@ -144,7 +136,6 @@ export default function BanksPage() {
     },
     { key: 'type', header: 'Type', cell: (b) => <Badge tone="primary">{TYPE_LABEL[b.institutionType]}</Badge>, className: 'hidden md:table-cell' },
     { key: 'contact', header: 'Contact', cell: (b) => b.contactPerson ?? '—', className: 'hidden lg:table-cell' },
-    { key: 'approval', header: 'Client approval', cell: (b) => (b.requiresClientApproval ? 'Required' : 'Not required'), className: 'hidden lg:table-cell' },
     { key: 'cases', header: 'Cases', cell: (b) => <span className="tabular">{b.caseCount}</span>, className: 'hidden sm:table-cell' },
     { key: 'status', header: 'Status', cell: (b) => <StatusBadge status={b.status} /> },
   ];

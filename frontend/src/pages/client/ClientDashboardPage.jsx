@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, ClipboardList, FileSignature, FileWarning, FolderKanban, MapPin, Scale } from 'lucide-react';
+import { CheckCircle2, FileSignature, FileWarning, FolderKanban, MapPin, Scale } from 'lucide-react';
 import { Link } from 'react-router';
 import { useAuth } from '@/context/AuthContext';
 import { portalApi } from '@/services/approvalsApi';
@@ -19,13 +19,12 @@ export default function ClientDashboardPage() {
   return (
     <>
       <PageHeader title={`Welcome, ${me.user.fullName.split(' ')[0]}`} description={`Your valuation cases with ${me.context.firm.name}`} />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-6">
         <StatCard label="Active cases" value={v(data?.counts.active)} icon={<FolderKanban />} href="/cases" />
         <StatCard label="Documents requested" value={v(data?.counts.pendingDocuments)} icon={<FileWarning />} />
         <StatCard label="In inspection" value={v(data?.counts.inspection)} icon={<MapPin />} />
         <StatCard label="In valuation" value={v(data?.counts.valuation)} icon={<Scale />} />
-        <StatCard label="Awaiting you" value={v(data?.counts.pendingApproval)} icon={<ClipboardList />} hint="Approve / sign" />
-        <StatCard label="Signed documents" value={v(data?.counts.signedDocuments)} icon={<FileSignature />} href="/repository" />
+        <StatCard label="Signed reports" value={v(data?.counts.signedReports)} icon={<FileSignature />} href="/repository" hint="Ready to download" />
         <StatCard label="Completed" value={v(data?.counts.completed)} icon={<CheckCircle2 />} />
       </div>
       {data && (
@@ -57,7 +56,7 @@ export default function ClientDashboardPage() {
             <CardContent className="space-y-2">
               {data.cases.length ? (
                 data.cases.map((c) => (
-                  <Link key={c.id} to={`/cases/${c.id}${['CLIENT_APPROVAL_PENDING', 'CLIENT_APPROVED'].includes(c.status) ? '?tab=approval' : ''}`} className="flex flex-wrap items-center gap-2 rounded-lg border p-3 hover:border-primary/40">
+                  <Link key={c.id} to={`/cases/${c.id}${c.status === 'CASE_COMPLETED' ? '?tab=approval' : ''}`} className="flex flex-wrap items-center gap-2 rounded-lg border p-3 hover:border-primary/40">
                     <span className="font-mono text-xs font-semibold">{c.caseNumber}</span>
                     <span className="text-xs text-muted-foreground">
                       {c.category.name} · {c.bank.shortCode} · {c.financialYear.label}

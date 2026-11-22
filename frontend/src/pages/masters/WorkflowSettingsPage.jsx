@@ -17,10 +17,6 @@ const SLA_STATUSES = [
   'FINAL_REVIEW_IN_PROGRESS',
   'SENT_BACK_FOR_CORRECTION',
   'FINAL_APPROVED',
-  'CLIENT_APPROVAL_PENDING',
-  'CLIENT_QUERY_RAISED',
-  'CLIENT_SIGNED',
-  'SUBMITTED_TO_BANK',
 ];
 
 /** Workflow configuration master: turnaround time per stage, auto-assignment and inspection rules. */
@@ -88,10 +84,6 @@ export default function WorkflowSettingsPage() {
             <label className="flex items-start gap-3">
               <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={options.requireSourceDocument} onChange={(e) => setOptions({ ...options, requireSourceDocument: e.target.checked })} />
               <span className="text-sm">Require at least one source document before a field officer can be assigned</span>
-            </label>
-            <label className="flex items-start gap-3">
-              <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={options.autoReleaseToClient !== false} onChange={(e) => setOptions({ ...options, autoReleaseToClient: e.target.checked })} />
-              <span className="text-sm">Send the report to the client for review and acceptance as soon as the valuer signs it (when the lender needs client approval and the client has a portal login)</span>
             </label>
             <Button loading={save.isPending} onClick={() => save.mutate()}>
               Save settings

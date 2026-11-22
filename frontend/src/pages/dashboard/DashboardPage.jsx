@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Banknote, CheckCircle2, ClipboardCheck, FilePlus2, FileSearch, FileSignature, FolderKanban, Landmark, MapPin, Plus, Scale, Send, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, FilePlus2, FileSearch, FileSignature, FolderKanban, MapPin, Plus, Scale, Send, Users } from 'lucide-react';
 import { Link } from 'react-router';
 import { useAuth } from '@/context/AuthContext';
 import { analyticsApi } from '@/services/analyticsApi';
@@ -20,20 +20,16 @@ const TILE_SETS = {
     ['inspectionCompleted', 'Inspection completed', ClipboardCheck, '/cases?statusGroup=PRELIMINARY'],
     ['preliminaryPending', 'Preliminary review pending', FileSearch, '/cases?statusGroup=PRELIMINARY'],
     ['seniorPending', 'Senior review pending', Scale, '/cases?statusGroup=SENIOR_REVIEW'],
-    ['clientApprovalPending', 'Client approval pending', FileSignature, '/cases?statusGroup=CLIENT'],
-    ['bankSubmissionPending', 'Bank submission pending', Send, '/cases?statusGroup=BANK'],
-    ['sanctioned', 'Sanctioned', Landmark, '/cases?statusGroup=LOAN'],
-    ['disbursed', 'Disbursed / completed', Banknote, '/cases?statusGroup=LOAN'],
+    ['awaitingSignature', 'Awaiting valuer signature', FileSignature, '/cases?statusGroup=AWAITING_SIGNATURE'],
+    ['completed', 'Completed (report signed)', CheckCircle2, '/cases?statusGroup=CLOSED'],
     ['overdue', 'Overdue', AlertTriangle, '/cases?overdue=true'],
   ],
   MARKETING: [
     ['received', 'Cases received', FolderKanban, '/cases'],
     ['pendingAssignment', 'Pending field assignment', MapPin, '/cases?statusGroup=NEW'],
     ['awaitingDocuments', 'Awaiting client documents', FileSearch, '/cases'],
-    ['pendingBankSubmission', 'Pending bank submission', Send, '/cases?statusGroup=BANK'],
-    ['submitted', 'Submitted to bank', Landmark, '/cases?statusGroup=BANK'],
-    ['sanctioned', 'Sanctioned', CheckCircle2, '/cases?statusGroup=LOAN'],
-    ['disbursed', 'Disbursed', Banknote, '/cases?statusGroup=LOAN'],
+    ['inValuation', 'In valuation', Scale, '/cases?statusGroup=ACTIVE'],
+    ['completed', 'Completed (report signed)', CheckCircle2, '/cases?statusGroup=CLOSED'],
   ],
   JUNIOR_REVIEWER: [
     ['pendingReviews', 'Pending reviews', FileSearch, '/cases?assignedToMe=true&statusGroup=PRELIMINARY'],
@@ -45,7 +41,7 @@ const TILE_SETS = {
     ['pendingApprovals', 'Pending approvals', FileSearch, '/cases?assignedToMe=true&statusGroup=SENIOR_REVIEW'],
     ['underReview', 'Reports under review', Scale, '/cases?assignedToMe=true&statusGroup=SENIOR_REVIEW'],
     ['returned', 'Returned reports', AlertTriangle, '/cases?assignedToMe=true&statusGroup=PRELIMINARY'],
-    ['awaitingSignature', 'Awaiting your signature', FileSignature, '/cases?assignedToMe=true&statusGroup=CLIENT'],
+    ['awaitingSignature', 'Awaiting your signature', FileSignature, '/cases?assignedToMe=true&statusGroup=AWAITING_SIGNATURE'],
     ['approved', 'Approved reports', CheckCircle2, '/cases?assignedToMe=true'],
   ],
 };

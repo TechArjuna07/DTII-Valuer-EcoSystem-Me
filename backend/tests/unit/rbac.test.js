@@ -27,11 +27,11 @@ describe('RBAC catalogue', () => {
 
   test('clients get only portal-level permissions', () => {
     const clientPerms = PERMISSION_DEFINITIONS.filter((p) => p.roles.includes(ROLES.CLIENT)).map((p) => p.code).sort();
-    expect(clientPerms).toEqual(['client.approve', 'document.upload', 'document.view', 'portal.access', 'signature.client']);
+    expect(clientPerms).toEqual(['document.upload', 'document.view', 'portal.access']);
   });
 
   test('workflow-integrity permissions are marked critical', () => {
-    for (const code of ['inspection.submit', 'valuation.approve', 'client.approve', 'signature.client', 'case.cancel']) {
+    for (const code of ['inspection.submit', 'valuation.approve', 'signature.valuer', 'case.cancel']) {
       expect(PERMISSION_DEFINITIONS.find((p) => p.code === code).isCritical).toBe(true);
     }
   });

@@ -18,7 +18,7 @@ router.get('/portal/summary', authenticate, requireFirmContext, requirePermissio
       select: { id: true, caseNumber: true, status: true, statusChangedAt: true, receivedOn: true, bank: { select: { name: true, shortCode: true } }, category: { select: { name: true } }, financialYear: { select: { label: true } } },
     }),
     prisma.documentRequest.findMany({ where: { firmId: req.principal.firmId, status: 'OPEN', requestedFrom: 'CLIENT', case: { clientId } }, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, description: true, dueDate: true, caseId: true, createdAt: true } }),
-    prisma.caseDocument.count({ where: { firmId: req.principal.firmId, folder: 'CLIENT_SIGNED_FILES', archivedAt: null, case: { clientId } } }),
+    prisma.caseDocument.count({ where: { firmId: req.principal.firmId, folder: 'FINAL_VALUATION_REPORT', visibility: 'CLIENT', archivedAt: null, case: { clientId } } }),
   ]);
   const inGroup = (g) => cases.filter((c) => STATUS_GROUPS[g].includes(c.status)).length;
   res.json({
@@ -27,8 +27,7 @@ router.get('/portal/summary', authenticate, requireFirmContext, requirePermissio
       pendingDocuments: requests.length,
       inspection: inGroup('INSPECTION'),
       valuation: inGroup('PRELIMINARY') + inGroup('SENIOR_REVIEW'),
-      pendingApproval: cases.filter((c) => ['CLIENT_APPROVAL_PENDING', 'CLIENT_APPROVED'].includes(c.status)).length,
-      signedDocuments: signedDocs,
+      signedReports: signedDocs,
       completed: cases.filter((c) => c.status === 'CASE_COMPLETED').length,
     },
     cases,
@@ -36,6 +35,6 @@ router.get('/portal/summary', authenticate, requireFirmContext, requirePermissio
   });
 });
 
-documentRoute({ method: 'get', path: '/portal/summary', tag: 'Client portal', summary: 'Client dashboard: own cases, pending documents, approvals, signed files', permission: 'portal.access' });
+documentRoute({ method: 'get', path: '/portal/summary', tag: 'Client portal', summary: 'Client dashboard: own cases, pending documents, signed reports', permission: 'portal.access' });
 
 export default router;

@@ -5,7 +5,7 @@ export const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\
 export const JPG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(128, 7)]);
 
 /** A firm with the full team, a bank, a portal client and the Land & Building category. */
-export async function setupFirm({ requiresClientApproval = true } = {}) {
+export async function setupFirm() {
   const sa = await createSuperadmin();
   const firm = await createFirm(sa.token, `Workflow Valuers ${uniq()}`);
   const [mk, fo, jr, sr] = await Promise.all([
@@ -14,7 +14,7 @@ export async function setupFirm({ requiresClientApproval = true } = {}) {
     createEmployee(firm.adminToken, ['JUNIOR_REVIEWER'], 'Juhi Junior'),
     createEmployee(firm.adminToken, ['SENIOR_REVIEWER'], 'Sanjay Senior'),
   ]);
-  const bank = (await as(firm.adminToken).post('/masters/banks', { institutionType: 'BANK', name: 'HDFC Bank', shortCode: 'HDFC', branch: `Branch ${uniq()}`, requiresClientApproval })).body;
+  const bank = (await as(firm.adminToken).post('/masters/banks', { institutionType: 'BANK', name: 'HDFC Bank', shortCode: 'HDFC', branch: `Branch ${uniq()}` })).body;
   const clientEmail = `client-${uniq()}@mail.test`;
   const created = (await as(firm.adminToken).post('/clients', { clientType: 'PRIVATE_LIMITED', name: 'ABC Industries Pvt Ltd', email: clientEmail, createPortalLogin: true })).body;
   await acceptInvite(created.portal.devInviteUrl);
@@ -85,19 +85,9 @@ export async function completeFinal(fx, caseId, { templateId } = {}) {
   return sr.post(`/cases/${caseId}/valuations/final/approve`, { comments: 'Approved for issue' });
 }
 
-/**
- * Valuer signs the approved final report and it reaches the client (→ CLIENT_APPROVAL_PENDING): automatically
- * on signing by default, or by an explicit release when the firm switched auto-release off.
- */
-export async function signAndRelease(fx, caseId) {
+/** Senior reviewer (valuer) digitally signs the approved final report — this completes the case (→ CASE_COMPLETED). */
+export async function signFinalReport(fx, caseId) {
   const s = await as(fx.sr.token).post(`/cases/${caseId}/signatures/valuer`, { password: PASSWORD, consent: true });
   if (s.status !== 200) throw new Error(`valuer signature failed: ${JSON.stringify(s.body)}`);
-  if (s.body.caseStatus === 'CLIENT_APPROVAL_PENDING') return s;
-  return as(fx.sr.token).post(`/cases/${caseId}/approval/release`);
-}
-
-/** Client approves and signs (→ CLIENT_SIGNED). */
-export async function clientApproveAndSign(fx, caseId) {
-  await as(fx.client.token).post(`/cases/${caseId}/approval/decision`, { decision: 'APPROVED' });
-  return as(fx.client.token).post(`/cases/${caseId}/signatures/client`, { password: PASSWORD, consent: true });
+  return s;
 }

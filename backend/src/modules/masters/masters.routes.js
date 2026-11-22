@@ -52,7 +52,7 @@ const docTypeUpdate = z.strictObject({ name: str(120).min(2).optional(), default
 const workflowBody = z.strictObject({
   slaHours: z.partialRecord(z.enum(ALL_STATUSES), z.number().int().min(0).max(24 * 90)).optional(),
   options: z
-    .strictObject({ autoAssign: z.enum(['MANUAL', 'LEAST_LOADED']), requireSourceDocument: z.boolean(), minInspectionPhotos: z.number().int().min(0).max(50), autoReleaseToClient: z.boolean().optional() })
+    .strictObject({ autoAssign: z.enum(['MANUAL', 'LEAST_LOADED']), requireSourceDocument: z.boolean(), minInspectionPhotos: z.number().int().min(0).max(50), autoReleaseToClient: z.boolean().optional() /* retired option, ignored */ })
     .optional(),
 });
 const inactive = z.strictObject({ includeInactive: z.enum(['true', 'false']).optional() });

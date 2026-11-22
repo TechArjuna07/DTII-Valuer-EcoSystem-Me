@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Eye, FileSignature, MessageSquareWarning, RefreshCw, Send, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Eye, FileSignature, RefreshCw, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { approvalsApi } from '@/services/approvalsApi';
 import { openDocument } from '@/services/documentsApi';
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Label, Skeleton, Textarea } from '@/components/ui/primitives';
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Label, Skeleton } from '@/components/ui/primitives';
 import { Dialog, DialogContent } from '@/components/ui/overlays';
 import { EmptyState, ErrorState } from '@/components/data/States';
 import { PasswordInput } from '@/components/forms/PasswordInput';
@@ -92,21 +92,20 @@ function SignatureList({ signatures, canVerify }) {
   );
 }
 
-/** "Client approval" tab: valuer signature + release (staff); review, approve / query and sign (client). */
+/** "Final report & signature" tab: the senior reviewer signs (which completes the case); the client downloads it. */
 export default function ApprovalTab({ c, isClient }) {
   const qc = useQueryClient();
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['approval', c.id], queryFn: () => approvalsApi.get(c.id) });
-  const [signing, setSigning] = useState(null);
-  const [query, setQuery] = useState(null);
-  const done = (res, msg) => {
-    qc.setQueryData(['approval', c.id], res);
-    qc.invalidateQueries({ queryKey: ['cases', 'detail', c.id] });
-    qc.invalidateQueries({ queryKey: ['documents', c.id] });
-    toast.success(msg);
-  };
-  const act = useMutation({
-    mutationFn: ({ fn }) => fn(),
-    onSuccess: (res, v) => done(res, v.role === 'VALUER' && res.caseStatus === 'CLIENT_APPROVAL_PENDING' ? 'Signed and sent to the client for approval' : v.msg),
+  const [signing, setSigning] = useState(false);
+  const sign = useMutation({
+    mutationFn: (password) => approvalsApi.signValuer(c.id, password),
+    onSuccess: (res) => {
+      qc.setQueryData(['approval', c.id], res);
+      qc.invalidateQueries({ queryKey: ['cases', 'detail', c.id] });
+      qc.invalidateQueries({ queryKey: ['documents', c.id] });
+      setSigning(false);
+      toast.success(res.caseStatus === 'CASE_COMPLETED' ? 'Report signed. The case is complete and the client can download the report.' : 'Signature request sent to the signing app');
+    },
     onError: (e) => toast.error(e.message),
   });
   if (error) return <ErrorState error={error} onRetry={refetch} />;
@@ -114,7 +113,7 @@ export default function ApprovalTab({ c, isClient }) {
   const f = data.finalReport;
   const p = data.permissions;
 
-  if (isClient && !data.released) return <EmptyState title="Your valuation report is being prepared" description="You will be notified when the final report is ready for your review." />;
+  if (isClient && !data.released) return <EmptyState title="Your valuation report is being prepared" description="You will be notified when the signed report is ready to download." />;
   if (!f) return <EmptyState title="No final report yet" description="The senior reviewer issues the final report after reviewing the preliminary valuation." />;
 
   return (
@@ -123,110 +122,44 @@ export default function ApprovalTab({ c, isClient }) {
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle>Final valuation report v{f.version}</CardTitle>
-            <CardDescription>
-              {f.valuerSigned ? 'Signed by the valuer.' : 'Awaiting the valuer’s signature.'} {data.released ? 'Released to the client.' : ''}
-            </CardDescription>
+            <CardDescription>{f.valuerSigned ? 'Digitally signed by the valuer. The case is complete.' : 'Awaiting the valuer’s digital signature.'}</CardDescription>
           </div>
           {f.documentId && (
             <Button variant="outline" onClick={() => openDocument(f.documentId, { disposition: 'inline' }).catch((e) => toast.error(e.message))}>
-              <Eye /> View report
+              <Eye /> {f.valuerSigned ? 'View signed report' : 'View report'}
             </Button>
           )}
         </CardHeader>
         <CardContent className="space-y-4">
           <ValuesSummary v={f} />
           <p className="break-all font-mono text-[10px] text-muted-foreground">Report file SHA-256 {f.documentSha256}</p>
-          {isClient ? (
-            <div className="flex flex-wrap gap-2">
-              {p.canDecide && (
-                <>
-                  <Button onClick={() => act.mutate({ fn: () => approvalsApi.decide(c.id, 'APPROVED'), msg: 'Thank you, your approval is recorded' })} loading={act.isPending}>
-                    <CheckCircle2 /> Approve report
-                  </Button>
-                  <Button variant="outline" onClick={() => setQuery('')}>
-                    <MessageSquareWarning /> Raise a query
-                  </Button>
-                </>
-              )}
-              {p.canClientSign && (
-                <Button onClick={() => setSigning('CLIENT')}>
-                  <FileSignature /> Sign acknowledgement
-                </Button>
-              )}
-              {c.status === 'CLIENT_QUERY_RAISED' && <p className="text-sm text-warning">Your query is with the valuer. You will be notified when the report is re-issued.</p>}
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {p.canValuerSign && (
-                <Button onClick={() => setSigning('VALUER')}>
-                  <FileSignature /> Sign as valuer
-                </Button>
-              )}
-              {p.canRelease && (
-                <Button loading={act.isPending} onClick={() => act.mutate({ fn: () => approvalsApi.release(c.id), msg: 'Report released to the client' })}>
-                  <Send /> Release to client
-                </Button>
-              )}
-              {!data.requiresClientApproval && c.status === 'FINAL_APPROVED' && <p className="text-sm text-muted-foreground">This lender does not require client approval: after the valuer signs, marketing submits the report to the bank.</p>}
-            </div>
+          {!isClient && p.canValuerSign && (
+            <Button onClick={() => setSigning(true)}>
+              <FileSignature /> Sign final report
+            </Button>
           )}
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Signatures</CardTitle>
+          <CardTitle>Signature</CardTitle>
           <CardDescription>
-            Provider: {humanize(data.provider.name)} {data.provider.legallyValid ? '(certificate-based)' : '(sandbox — testing only)'}
+            Provider: {humanize(data.provider.name)} {data.provider.legallyValid ? '(certificate-based)' : '(sandbox — testing only, until the DSC integration)'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <SignatureList signatures={data.signatures} canVerify={!isClient} />
         </CardContent>
       </Card>
-      {data.approvals.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Client responses</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {data.approvals.map((a) => (
-              <p key={a.id} className="rounded-lg border p-3 text-sm">
-                <Badge tone={a.decision === 'APPROVED' ? 'success' : 'warning'}>{a.decision === 'APPROVED' ? 'approved' : 'query'}</Badge> <span className="text-xs text-muted-foreground">{formatDateTime(a.createdAt)}</span>
-                {a.comments && <span className="mt-1 block">{a.comments}</span>}
-              </p>
-            ))}
-          </CardContent>
-        </Card>
-      )}
       {signing && (
         <SignDialog
-          title={signing === 'VALUER' ? 'Sign the final report as valuer' : 'Sign the acknowledgement'}
+          title="Sign the final report as valuer"
           consentText={data.consentText}
           legallyValid={data.provider.legallyValid}
-          pending={act.isPending}
-          onClose={() => setSigning(null)}
-          onSign={(password) =>
-            act.mutate(
-              { role: signing, fn: () => (signing === 'VALUER' ? approvalsApi.signValuer(c.id, password) : approvalsApi.signClient(c.id, password)), msg: data.provider.synchronous ? 'Signed successfully' : 'Signature request sent to the signing app' },
-              { onSuccess: () => setSigning(null) },
-            )
-          }
+          pending={sign.isPending}
+          onClose={() => setSigning(false)}
+          onSign={(password) => sign.mutate(password)}
         />
-      )}
-      {query !== null && (
-        <Dialog open onOpenChange={(o) => !o && setQuery(null)}>
-          <DialogContent title="Raise a query" description="Tell the valuer what needs to be checked (e.g. an area or ownership detail). The report will be reviewed and re-issued.">
-            <Textarea value={query} onChange={(e) => setQuery(e.target.value)} maxLength={3000} aria-label="Your query" />
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setQuery(null)}>
-                Cancel
-              </Button>
-              <Button disabled={query.trim().length < 3} loading={act.isPending} onClick={() => act.mutate({ fn: () => approvalsApi.decide(c.id, 'QUERY', query.trim()), msg: 'Query sent to the valuer' }, { onSuccess: () => setQuery(null) })}>
-                Send query
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       )}
     </div>
   );

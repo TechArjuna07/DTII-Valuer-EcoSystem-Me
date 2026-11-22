@@ -33,7 +33,6 @@ export default function ReportsPage() {
     { key: 'client', header: 'Client', cell: (r) => r.client },
     { key: 'bank', header: 'Bank', cell: (r) => r.bank, className: 'hidden lg:table-cell' },
     { key: 'mv', header: 'Market value', cell: (r) => <span className="tabular">{r.marketValue != null ? formatINR(r.marketValue) : '—'}</span>, className: 'hidden md:table-cell' },
-    { key: 'sanctioned', header: 'Sanctioned', cell: (r) => <span className="tabular">{r.sanctioned != null ? formatINR(r.sanctioned) : '—'}</span>, className: 'hidden xl:table-cell' },
     { key: 'status', header: 'Status', cell: (r) => <CaseStatusBadge status={r.status} overdue={r.overdue} /> },
   ];
   const field = (k, label, el) => (
@@ -116,8 +115,6 @@ export default function ReportsPage() {
         <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="Cases" value={data.totals.cases} />
           <StatCard label="Total market value" value={formatINR(data.totals.marketValue)} />
-          <StatCard label="Total sanctioned" value={formatINR(data.totals.sanctioned)} />
-          <StatCard label="Total disbursed" value={formatINR(data.totals.disbursed)} />
         </div>
       )}
       <Card>

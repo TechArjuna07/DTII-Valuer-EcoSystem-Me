@@ -76,17 +76,10 @@ const PERMISSION_DEFINITIONS = [
   ['valuation.submit', 'valuations', 'Submit preliminary valuation for senior review', [JR], true],
   ['valuation.review', 'valuations', 'Review, return or reject preliminary valuations', [SR], true],
   ['valuation.approve', 'valuations', 'Approve valuation and issue the final report', [SR], true],
-  ['report.release', 'valuations', 'Release the final report to the client', [FA, SR], true],
   ['signature.valuer', 'signatures', 'Digitally sign final reports as valuer', [SR], true],
 
   // Client portal
   ['portal.access', 'portal', 'Use the client portal', [CL], true],
-  ['client.approve', 'approvals', 'Approve or raise an objection on the final report', [CL], true],
-  ['signature.client', 'signatures', 'Digitally sign documents as client', [CL], true],
-
-  // Bank & loan
-  ['bank.submit', 'submissions', 'Record bank/NBFC submission and acknowledgement', [FA, MK]],
-  ['loan.update', 'loans', 'Record loan sanction and disbursement', [FA, MK]],
 
   // IGR Maharashtra eASR (government ready-reckoner rates, shared platform data)
   ['asr.view', 'asr', 'Look up IGR Maharashtra eASR rates (ready reckoner)', [SA, ...STAFF]],

@@ -51,9 +51,6 @@ function evaluate(principal, c, def, assignments) {
       return { ok: false, reason: 'The preparer of a valuation cannot review it' };
     }
   }
-  if (def.action === 'SUBMIT_TO_BANK' && c.status === STATUS.FINAL_APPROVED && c.bank?.requiresClientApproval !== false) {
-    return { ok: false, reason: 'This lender requires client approval and signature first' };
-  }
   return { ok: true };
 }
 
