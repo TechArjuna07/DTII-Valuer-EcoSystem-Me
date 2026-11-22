@@ -104,6 +104,24 @@ function defaultInputs(engine, src) {
       roundTo: 1000,
     };
   }
+  if (engine === 'FLAT') {
+    const builtYear = Number(d.yearOfConstruction ?? i?.construction?.yearOfConstruction);
+    return {
+      builtUpArea: Number(i?.buildingArea ?? 0) || 0,
+      areaUnit: i?.buildingAreaUnit === 'sq.m' ? 'sq.m' : 'sq.ft',
+      areaBasis: 'Built up area',
+      compositeRate: 0,
+      constructionCostPerUnit: 0,
+      ageYears: builtYear ? Math.max(0, year - builtYear) : 0,
+      totalLifeYears: 60,
+      salvagePct: 10,
+      extras: [],
+      realisablePct: 98,
+      distressPct: 75,
+      roundTo: 1,
+      report: { purpose: 'To avail Housing Loan', documents: [], marketability: 'Good', negativeFactors: 'None' },
+    };
+  }
   if (engine === 'PLANT_MACHINERY') return { valuationYear: year, items: [{ description: '', quantity: 1, yearOfPurchase: year, replacementCostNew: 0, usefulLifeYears: 15, conditionFactor: 1 }], salvagePct: 5, realisablePct: 85, distressPct: 70, roundTo: 1000 };
   return { items: [{ description: '', category: 'RAW_MATERIAL', quantity: 0, unit: 'nos', ratePerUnit: 0, obsolescencePct: 0 }], realisablePct: 75, distressPct: 60, roundTo: 1000 };
 }
@@ -233,7 +251,7 @@ async function createVersion(principal, caseId, stage, { inputs, summary, change
           reportId: report.id,
           version,
           inputs: calc.inputs,
-          calculation: { lines: calc.lines, assumptions: calc.assumptions, totals: calc.totals },
+          calculation: { lines: calc.lines, assumptions: calc.assumptions, totals: calc.totals, ...(calc.flat ? { flat: calc.flat } : {}) },
           marketValue: calc.totals.marketValue,
           realisableValue: calc.totals.realisableValue,
           distressValue: calc.totals.distressValue,

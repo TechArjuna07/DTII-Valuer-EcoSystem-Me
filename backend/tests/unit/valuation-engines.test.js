@@ -60,3 +60,20 @@ describe('valuation engines', () => {
     expect(amountInWords(0)).toBe('Rupees Zero Only');
   });
 });
+
+describe('FLAT engine (SBI / IBA composite rate format)', () => {
+  test('reproduces the bank report figures: 520 sq.ft @ ₹22,500, construction ₹2,500, age 24', () => {
+    const r = calculate('FLAT', { builtUpArea: 520, compositeRate: 22500, constructionCostPerUnit: 2500, ageYears: 24, bookValue: 8500000, readyReckonerValue: 6987261 });
+    expect(r.totals).toEqual({ marketValue: 11232000, realisableValue: 11007360, distressValue: 8424000, guidelineValue: 6987261, insurableValue: 1300000 });
+    expect(r.flat).toMatchObject({ yearlyDepreciationPct: 1.5, depreciationPct: 36, depreciatedRatioPct: 64, remainingLifeYears: 36, depreciationPerUnit: 900, netRate: 21600, replacementCost: 1300000, depreciatedBuildingValue: 832000, bookValue: 8500000 });
+    expect(r.lines.map((l) => l.amount)).toEqual([11700000, -468000, 11232000]);
+  });
+
+  test('extras add to the value; depreciation stops at the salvage floor; guideline value from the rate', () => {
+    const r = calculate('FLAT', { builtUpArea: 100, compositeRate: 10000, constructionCostPerUnit: 2000, ageYears: 90, extras: [{ description: 'Wardrobes', amount: 50000 }], guidelineRatePerSqM: 100000, roundTo: 1000 });
+    expect(r.flat.depreciationPct).toBe(90);
+    expect(r.totals.marketValue).toBe(100 * (10000 - 1800) + 50000);
+    expect(r.totals.guidelineValue).toBe(929000); // 100 sq.ft = 9.29 sq.m
+    expect(() => calculate('FLAT', { builtUpArea: 0, compositeRate: 1, constructionCostPerUnit: 1, ageYears: 1 })).toThrow();
+  });
+});
