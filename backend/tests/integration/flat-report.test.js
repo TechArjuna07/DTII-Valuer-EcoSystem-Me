@@ -142,7 +142,9 @@ describe('residential flat — bank (SBI) report format', () => {
 
     await sr.post(`/cases/${c.id}/valuations/final/approve`, { comments: 'Approved' });
     const signed = await signFinalReport(fx, c.id);
-    expect(signed.body.caseStatus).toBe('CASE_COMPLETED');
+    expect(signed.body.caseStatus).toBe('PAYMENT_PENDING');
+    // The expected amount comes from the invoice: 2,500 + 9% CGST + 9% SGST.
+    expect((await as(fx.mk.token).get(`/cases/${c.id}/approval`)).body.payment.expectedAmount).toBe(2950);
     expect(await pageCount(signed.body.signatures[0].signedVersionId)).toBe(finPages + 1); // + signature page
   }, 300_000);
 });

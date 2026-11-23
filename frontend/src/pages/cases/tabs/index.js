@@ -13,7 +13,7 @@ import TimelineTab from './TimelineTab';
  * (ctx = { c, me, can, isClient }); the API independently authorises every request each tab makes.
  */
 const hasRole = (me, ...codes) => me.context.roles.some((r) => codes.includes(r.code));
-const AFTER_FINAL = ['FINAL_APPROVED', 'CASE_COMPLETED'];
+const AFTER_FINAL = ['FINAL_APPROVED', 'PAYMENT_PENDING', 'CASE_COMPLETED'];
 
 export const CASE_TABS = [
   { key: 'overview', label: 'Overview', Component: OverviewTab, show: () => true },
@@ -30,7 +30,7 @@ export const CASE_TABS = [
   },
   {
     key: 'approval',
-    label: 'Final report & signature',
+    label: 'Final report & payment',
     Component: ApprovalTab,
     show: ({ c, isClient, me }) => (isClient ? c.status === 'CASE_COMPLETED' : hasRole(me, 'FIRM_ADMIN', 'SENIOR_REVIEWER', 'MARKETING') || AFTER_FINAL.includes(c.status)),
   },

@@ -85,9 +85,16 @@ export async function completeFinal(fx, caseId, { templateId } = {}) {
   return sr.post(`/cases/${caseId}/valuations/final/approve`, { comments: 'Approved for issue' });
 }
 
-/** Senior reviewer (valuer) digitally signs the approved final report — this completes the case (→ CASE_COMPLETED). */
+/** Senior reviewer (valuer) digitally signs the approved final report (→ PAYMENT_PENDING). */
 export async function signFinalReport(fx, caseId) {
   const s = await as(fx.sr.token).post(`/cases/${caseId}/signatures/valuer`, { password: PASSWORD, consent: true });
   if (s.status !== 200) throw new Error(`valuer signature failed: ${JSON.stringify(s.body)}`);
   return s;
+}
+
+/** Marketing records that the report fee is received (→ CASE_COMPLETED). */
+export async function recordPayment(fx, caseId, body = {}) {
+  const r = await as(fx.mk.token).post(`/cases/${caseId}/payments`, { amount: 2950, receivedOn: new Date().toISOString().slice(0, 10), mode: 'UPI', reference: 'UPI-REF-1', ...body });
+  if (r.status !== 200) throw new Error(`payment failed: ${JSON.stringify(r.body)}`);
+  return r;
 }

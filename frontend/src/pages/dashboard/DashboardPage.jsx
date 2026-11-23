@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, FilePlus2, FileSearch, FileSignature, FolderKanban, MapPin, Plus, Scale, Send, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, FilePlus2, FileSearch, FileSignature, FolderKanban, IndianRupee, MapPin, Plus, Scale, Send, Users } from 'lucide-react';
 import { Link } from 'react-router';
 import { useAuth } from '@/context/AuthContext';
 import { analyticsApi } from '@/services/analyticsApi';
@@ -21,6 +21,7 @@ const TILE_SETS = {
     ['preliminaryPending', 'Preliminary review pending', FileSearch, '/cases?statusGroup=PRELIMINARY'],
     ['seniorPending', 'Senior review pending', Scale, '/cases?statusGroup=SENIOR_REVIEW'],
     ['awaitingSignature', 'Awaiting valuer signature', FileSignature, '/cases?statusGroup=AWAITING_SIGNATURE'],
+    ['awaitingPayment', 'Signed – payment pending', IndianRupee, '/cases?statusGroup=AWAITING_PAYMENT'],
     ['completed', 'Completed (report signed)', CheckCircle2, '/cases?statusGroup=CLOSED'],
     ['overdue', 'Overdue', AlertTriangle, '/cases?overdue=true'],
   ],
@@ -29,6 +30,7 @@ const TILE_SETS = {
     ['pendingAssignment', 'Pending field assignment', MapPin, '/cases?statusGroup=NEW'],
     ['awaitingDocuments', 'Awaiting client documents', FileSearch, '/cases'],
     ['inValuation', 'In valuation', Scale, '/cases?statusGroup=ACTIVE'],
+    ['awaitingPayment', 'Signed – payment pending', IndianRupee, '/cases?statusGroup=AWAITING_PAYMENT'],
     ['completed', 'Completed (report signed)', CheckCircle2, '/cases?statusGroup=CLOSED'],
   ],
   JUNIOR_REVIEWER: [

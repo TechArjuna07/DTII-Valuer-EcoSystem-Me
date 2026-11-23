@@ -9,6 +9,7 @@ export const CASE_STATUS = {
   FINAL_REVIEW_IN_PROGRESS: { label: 'Final review', tone: 'primary' },
   SENT_BACK_FOR_CORRECTION: { label: 'Sent back for correction', tone: 'warning' },
   FINAL_APPROVED: { label: 'Final approved – awaiting signature', tone: 'success' },
+  PAYMENT_PENDING: { label: 'Report signed – payment pending', tone: 'warning' },
   // Retired steps — kept only to label older history entries.
   CLIENT_APPROVAL_PENDING: { label: 'Client approval pending', tone: 'warning' },
   CLIENT_QUERY_RAISED: { label: 'Client query raised', tone: 'warning' },
@@ -30,6 +31,7 @@ export const STATUS_GROUPS = [
   ['PRELIMINARY', 'Preliminary valuation'],
   ['SENIOR_REVIEW', 'Senior review'],
   ['AWAITING_SIGNATURE', 'Awaiting signature'],
+  ['AWAITING_PAYMENT', 'Awaiting payment'],
   ['ON_HOLD', 'On hold'],
   ['CLOSED', 'Closed'],
 ];
@@ -40,6 +42,7 @@ export const ACTION_LABEL = {
   START_FINAL_REVIEW: 'Start final review',
   REQUEST_REINSPECTION: 'Request re-inspection',
   CLOSE_CASE: 'Close case',
+  RECORD_PAYMENT: 'Payment received',
   HOLD: 'Put on hold',
   RESUME: 'Resume',
   CANCEL: 'Cancel case',

@@ -538,6 +538,8 @@ enum CaseStatus {
   FINAL_REVIEW_IN_PROGRESS
   SENT_BACK_FOR_CORRECTION
   FINAL_APPROVED
+  /// Report signed by the valuer; the case stays open until the fee is received
+  PAYMENT_PENDING
   CLIENT_APPROVAL_PENDING
   CLIENT_QUERY_RAISED
   CLIENT_APPROVED
@@ -627,6 +629,7 @@ model ValuationCase {
   submissions   BankSubmission[]
   sanction      LoanSanction?
   disbursements LoanDisbursement[]
+  payments      CasePayment[]
 
   @@unique([firmId, id])
   @@index([firmId, status])
@@ -1405,4 +1408,47 @@ model AsrFetchLog {
 
   @@index([createdAt(sort: Desc)])
   @@map("asr_fetch_logs")
+}
+
+// ───────────────────────────── Report fee payment ─────────────────────────────
+
+enum PaymentMode {
+  CASH
+  UPI
+  BANK_TRANSFER
+  CHEQUE
+  CARD
+  GATEWAY
+  OTHER
+}
+
+enum PaymentSource {
+  /// recorded by staff with the "Payment received" button
+  MANUAL
+  /// confirmed by a payment gateway (future)
+  GATEWAY
+}
+
+/// Payment of the valuation fee. Recording it completes the case (PAYMENT_PENDING → CASE_COMPLETED).
+/// Append-only: corrections are new rows, history is never rewritten.
+model CasePayment {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firmId       String        @map("firm_id") @db.Uuid
+  caseId       String        @map("case_id") @db.Uuid
+  amount       Decimal       @db.Decimal(14, 2)
+  receivedOn   DateTime      @map("received_on") @db.Date
+  mode         PaymentMode
+  source       PaymentSource @default(MANUAL)
+  reference    String?       @db.VarChar(120)
+  remarks      String?       @db.VarChar(1000)
+  /// Gateway order / transaction id (future), unique per gateway transaction
+  gatewayRef   String?       @unique @map("gateway_ref") @db.VarChar(120)
+  recordedById String?       @map("recorded_by_id") @db.Uuid
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  case ValuationCase @relation(fields: [firmId, caseId], references: [firmId, id], onDelete: Restrict)
+
+  @@index([caseId])
+  @@index([firmId, receivedOn])
+  @@map("case_payments")
 }

@@ -32,6 +32,7 @@ const ON_STATUS = {
   PRELIMINARY_SUBMITTED: { who: ['SENIOR'], unassignedFallback: 'SENIOR', title: 'Senior review pending', body: (c) => `The preliminary valuation of ${c.caseNumber} has been submitted for your review.`, tab: 'senior' },
   SENT_BACK_FOR_CORRECTION: { who: ['JUNIOR'], title: 'Valuation returned for correction', body: (c) => `The senior reviewer returned ${c.caseNumber} for correction.`, tab: 'preliminary' },
   FINAL_APPROVED: { who: ['ADMINS', 'MARKETING', 'SENIOR'], title: 'Final report approved', body: (c) => `The final valuation report of ${c.caseNumber} is approved and awaits the valuer's signature.`, tab: 'approval' },
+  PAYMENT_PENDING: { who: ['MARKETING', 'ADMINS'], title: 'Report signed - payment pending', body: (c) => `The valuation report ${c.caseNumber} is signed. Record the payment once the fee is received to complete the case.`, tab: 'approval' },
   CASE_COMPLETED: { who: ['CLIENT', 'MARKETING', 'ADMINS'], title: 'Valuation report issued', body: (c) => `The digitally signed valuation report ${c.caseNumber} is ready and can be downloaded from the case.`, tab: 'approval' },
   CASE_ON_HOLD: { who: ['MARKETING', 'FIELD', 'JUNIOR', 'SENIOR'], title: 'Case put on hold', body: (c) => `${c.caseNumber} is on hold.`, tab: 'timeline' },
   CASE_CANCELLED: { who: ['MARKETING', 'FIELD', 'JUNIOR', 'SENIOR', 'ADMINS'], title: 'Case cancelled', body: (c) => `${c.caseNumber} was cancelled.`, tab: 'timeline' },

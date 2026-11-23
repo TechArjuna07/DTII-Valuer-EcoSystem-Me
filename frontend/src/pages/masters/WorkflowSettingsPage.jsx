@@ -17,6 +17,7 @@ const SLA_STATUSES = [
   'FINAL_REVIEW_IN_PROGRESS',
   'SENT_BACK_FOR_CORRECTION',
   'FINAL_APPROVED',
+  'PAYMENT_PENDING',
 ];
 
 /** Workflow configuration master: turnaround time per stage, auto-assignment and inspection rules. */

@@ -29,6 +29,7 @@ const S = Object.freeze({
   FINAL_REVIEW_IN_PROGRESS: 'FINAL_REVIEW_IN_PROGRESS',
   SENT_BACK_FOR_CORRECTION: 'SENT_BACK_FOR_CORRECTION',
   FINAL_APPROVED: 'FINAL_APPROVED',
+  PAYMENT_PENDING: 'PAYMENT_PENDING',
   CLIENT_APPROVAL_PENDING: 'CLIENT_APPROVAL_PENDING',
   CLIENT_QUERY_RAISED: 'CLIENT_QUERY_RAISED',
   CLIENT_APPROVED: 'CLIENT_APPROVED',
@@ -62,6 +63,7 @@ const PIPELINE = [
   S.PRELIMINARY_SUBMITTED,
   S.FINAL_REVIEW_IN_PROGRESS,
   S.FINAL_APPROVED,
+  S.PAYMENT_PENDING,
   S.CASE_COMPLETED,
 ];
 
@@ -71,6 +73,7 @@ const STATUS_GROUPS = Object.freeze({
   PRELIMINARY: [S.INSPECTION_COMPLETED, S.PRELIMINARY_VALUATION_IN_PROGRESS, S.SENT_BACK_FOR_CORRECTION],
   SENIOR_REVIEW: [S.PRELIMINARY_SUBMITTED, S.FINAL_REVIEW_IN_PROGRESS],
   AWAITING_SIGNATURE: [S.FINAL_APPROVED],
+  AWAITING_PAYMENT: [S.PAYMENT_PENDING],
   CLOSED: TERMINAL,
   ON_HOLD: [S.CASE_ON_HOLD],
   ACTIVE,
@@ -89,8 +92,10 @@ const TRANSITIONS = [
   T('REQUEST_REINSPECTION', S.FINAL_REVIEW_IN_PROGRESS, S.INSPECTION_IN_PROGRESS, 'valuation.review', { stage: 'SENIOR', remarks: true, generic: true }),
   T('APPROVE_FINAL', S.FINAL_REVIEW_IN_PROGRESS, S.FINAL_APPROVED, 'valuation.approve', { stage: 'SENIOR' }),
   T('REJECT_VALUATION', S.FINAL_REVIEW_IN_PROGRESS, S.CASE_REJECTED, 'valuation.review', { stage: 'SENIOR', remarks: true }),
-  // The senior's digital signature on the approved final report completes the case (signed report shared with the client).
-  T('VALUER_SIGNATURE_COMPLETED', S.FINAL_APPROVED, S.CASE_COMPLETED, null, { system: true, clientVisible: true }),
+  // The senior's digital signature on the approved final report; the case stays open until the fee is received.
+  T('VALUER_SIGNATURE_COMPLETED', S.FINAL_APPROVED, S.PAYMENT_PENDING, null, { system: true, clientVisible: true }),
+  // "Payment received" (staff button today, payment gateway later) completes the case and releases the signed report.
+  T('RECORD_PAYMENT', S.PAYMENT_PENDING, S.CASE_COMPLETED, 'payment.record', { clientVisible: true }),
   // Only for cases left in a retired step (see LEGACY).
   T('CLOSE_CASE', LEGACY, S.CASE_COMPLETED, 'case.close', { stage: 'MARKETING', adminOverride: true, generic: true, remarks: true, clientVisible: true }),
   T('HOLD', ACTIVE, S.CASE_ON_HOLD, 'case.hold', { remarks: true, generic: true, clientVisible: true }),

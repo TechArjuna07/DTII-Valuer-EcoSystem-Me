@@ -31,7 +31,7 @@ import { resolveForCase } from './templates.service.js';
  * Versions and reviews are immutable; maker-checker is enforced (the junior can never act as senior on a case).
  */
 const emitAll = (events) => events.forEach(([n, p]) => emit(n, p));
-const FINAL_VISIBLE_TO_MARKETING = [STATUS.FINAL_APPROVED, STATUS.CASE_COMPLETED];
+const FINAL_VISIBLE_TO_MARKETING = [STATUS.FINAL_APPROVED, STATUS.PAYMENT_PENDING, STATUS.CASE_COMPLETED];
 
 const caseInclude = { client: true, bank: true, category: true, financialYear: true, organization: true };
 

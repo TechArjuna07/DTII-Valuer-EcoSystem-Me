@@ -94,9 +94,7 @@ describe('junior reviewer → senior reviewer → signed report', () => {
 
     await completeFinal(fx, c.id);
     const signed = await signFinalReport(fx, c.id);
-    expect(signed.body.caseStatus).toBe('CASE_COMPLETED');
-    const view = await as(fx.client.token).get(`/cases/${c.id}/approval`);
-    expect(view.body.released).toBe(true);
+    expect(signed.body.caseStatus).toBe('PAYMENT_PENDING');
   }, 120_000);
 
   test('maker-checker: a reviewer holding both roles is never offered as senior on a case they prepared', async () => {

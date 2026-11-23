@@ -81,6 +81,9 @@ const PERMISSION_DEFINITIONS = [
   // Client portal
   ['portal.access', 'portal', 'Use the client portal', [CL], true],
 
+  // Report fee
+  ['payment.record', 'payments', 'Record that the report fee is received (completes the case)', [FA, MK]],
+
   // IGR Maharashtra eASR (government ready-reckoner rates, shared platform data)
   ['asr.view', 'asr', 'Look up IGR Maharashtra eASR rates (ready reckoner)', [SA, ...STAFF]],
   ['asr.manage', 'asr', 'Refresh cached eASR data and view fetch status', [SA], true],
