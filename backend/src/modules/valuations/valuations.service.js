@@ -17,6 +17,10 @@ import { FileValidationError, validateFile } from '../documents/file-validator.j
 import { calculate } from './engines/index.js';
 import { buildReportContext, compileTemplate } from './report-context.js';
 import { DEFAULT_TEMPLATE } from './templates/default-report.js';
+import { FLAT_SBI_TEMPLATE } from './templates/flat-sbi.js';
+import { buildFlatContext } from './report-flat.js';
+import { appendAnnexures } from '../../services/pdf/annexures.js';
+import { getBuffer } from '../../services/storage/storage.service.js';
 import { resolveForCase } from './templates.service.js';
 
 /**
@@ -27,7 +31,7 @@ import { resolveForCase } from './templates.service.js';
  * Versions and reviews are immutable; maker-checker is enforced (the junior can never act as senior on a case).
  */
 const emitAll = (events) => events.forEach(([n, p]) => emit(n, p));
-const FINAL_VISIBLE_TO_MARKETING = [STATUS.FINAL_APPROVED, STATUS.CLIENT_APPROVAL_PENDING, STATUS.CLIENT_QUERY_RAISED, STATUS.CLIENT_APPROVED, STATUS.CLIENT_SIGNED, STATUS.SUBMITTED_TO_BANK, STATUS.LOAN_SANCTIONED, STATUS.DISBURSED, STATUS.CASE_COMPLETED];
+const FINAL_VISIBLE_TO_MARKETING = [STATUS.FINAL_APPROVED, STATUS.PAYMENT_PENDING, STATUS.CASE_COMPLETED];
 
 const caseInclude = { client: true, bank: true, category: true, financialYear: true, organization: true };
 
@@ -104,6 +108,24 @@ function defaultInputs(engine, src) {
       roundTo: 1000,
     };
   }
+  if (engine === 'FLAT') {
+    const builtYear = Number(d.yearOfConstruction ?? i?.construction?.yearOfConstruction);
+    return {
+      builtUpArea: Number(i?.buildingArea ?? 0) || 0,
+      areaUnit: i?.buildingAreaUnit === 'sq.m' ? 'sq.m' : 'sq.ft',
+      areaBasis: 'Built up area',
+      compositeRate: 0,
+      constructionCostPerUnit: 0,
+      ageYears: builtYear ? Math.max(0, year - builtYear) : 0,
+      totalLifeYears: 60,
+      salvagePct: 10,
+      extras: [],
+      realisablePct: 98,
+      distressPct: 75,
+      roundTo: 1,
+      report: { purpose: 'To avail Housing Loan', documents: [], marketability: 'Good', negativeFactors: 'None' },
+    };
+  }
   if (engine === 'PLANT_MACHINERY') return { valuationYear: year, items: [{ description: '', quantity: 1, yearOfPurchase: year, replacementCostNew: 0, usefulLifeYears: 15, conditionFactor: 1 }], salvagePct: 5, realisablePct: 85, distressPct: 70, roundTo: 1000 };
   return { items: [{ description: '', category: 'RAW_MATERIAL', quantity: 0, unit: 'nos', ratePerUnit: 0, obsolescencePct: 0 }], realisablePct: 75, distressPct: 60, roundTo: 1000 };
 }
@@ -161,9 +183,36 @@ async function peopleFor(c, assignments) {
 }
 
 /** Renders the PDF for a version (null when no renderer is configured; the valuer can upload a PDF instead). */
+/** Document types appended to the bank-format flat report, in this order. */
+const ANNEXURE_TYPES = ['LOCATION_MAP', 'READY_RECKONER_EVIDENCE', 'MARKET_COMPARABLES'];
+const ANNEXURE_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
+
+async function annexuresFor(c) {
+  const types = await prisma.documentType.findMany({ where: { code: { in: ANNEXURE_TYPES }, OR: [{ firmId: null }, { firmId: c.firmId }] }, select: { id: true, code: true, name: true } });
+  const typeOf = new Map(types.map((t) => [t.id, t]));
+  const docs = await prisma.caseDocument.findMany({ where: { caseId: c.id, archivedAt: null, currentVersionId: { not: null }, documentTypeId: { in: [...typeOf.keys()] } }, orderBy: { createdAt: 'asc' } });
+  const rank = (d) => ANNEXURE_TYPES.indexOf(typeOf.get(d.documentTypeId).code);
+  docs.sort((a, b) => rank(a) - rank(b));
+  const out = [];
+  for (const d of docs) {
+    const v = await prisma.documentVersion.findUnique({ where: { id: d.currentVersionId } });
+    if (!v || !ANNEXURE_MIME.includes(v.mimeType) || ['INFECTED', 'PENDING', 'ERROR'].includes(v.scanStatus)) continue;
+    out.push({ title: typeOf.get(d.documentTypeId).name.replace(/ \(annexure\)$/, ''), mimeType: v.mimeType, buffer: await getBuffer(v.storageKey) });
+  }
+  return out;
+}
+
 async function renderPdf({ c, stage, version, calc, summary, verificationCode, templateVersion, assignments }) {
   if (!rendererAvailable()) return null;
   const src = await sourceData(c);
+  if (c.category.engine === 'FLAT' && !templateVersion) {
+    // Bank (SBI / IBA) flat format; the proforma invoice and annexures belong to the final report only.
+    const flatCalc = stage === 'FINAL' ? calc : { ...calc, inputs: { ...calc.inputs, invoice: {} } };
+    const context = await buildFlatContext({ c, src, calc: flatCalc, stage, version, summary, people: await peopleFor(c, assignments), verificationCode });
+    const headerText = `Ref.No- ${c.caseNumber}${stage === 'FINAL' ? '' : ' (PRELIMINARY)'}`;
+    const pdf = await htmlToPdf(compileTemplate(FLAT_SBI_TEMPLATE)(context), { headerText, pageTotal: false, footerText: `${stage === 'FINAL' ? 'Valuation report' : 'Preliminary valuation'} v${version}` });
+    return stage === 'FINAL' ? appendAnnexures(pdf, await annexuresFor(c), { headerText }) : pdf;
+  }
   const context = await buildReportContext({ c, propertyFields: src.fields, propertyData: src.data, inspection: src.inspection, calc, stage, version, summary, people: await peopleFor(c, assignments), verificationCode });
   const html = compileTemplate(templateVersion?.bodyHtml ?? DEFAULT_TEMPLATE)(context);
   return htmlToPdf(html, { footerText: `${c.caseNumber} · ${stage === 'FINAL' ? 'Valuation report' : 'Preliminary valuation'} v${version}` });
@@ -233,7 +282,7 @@ async function createVersion(principal, caseId, stage, { inputs, summary, change
           reportId: report.id,
           version,
           inputs: calc.inputs,
-          calculation: { lines: calc.lines, assumptions: calc.assumptions, totals: calc.totals },
+          calculation: { lines: calc.lines, assumptions: calc.assumptions, totals: calc.totals, ...(calc.flat ? { flat: calc.flat } : {}) },
           marketValue: calc.totals.marketValue,
           realisableValue: calc.totals.realisableValue,
           distressValue: calc.totals.distressValue,

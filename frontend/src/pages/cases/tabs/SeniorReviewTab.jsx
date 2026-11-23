@@ -46,7 +46,7 @@ export default function SeniorReviewTab({ c }) {
           <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
             <div>
               <p className="font-medium">Next step: sign the final report as valuer</p>
-              <p className="text-sm text-muted-foreground">Once signed, the report is sent to the client for review and acceptance.</p>
+              <p className="text-sm text-muted-foreground">After signing, the case waits for the fee; recording the payment completes it and releases the report to the client.</p>
             </div>
             <Button onClick={goSign}>
               <FileSignature /> Sign final report

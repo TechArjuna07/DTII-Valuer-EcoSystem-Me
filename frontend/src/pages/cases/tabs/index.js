@@ -6,7 +6,6 @@ import DocumentsTab from './DocumentsTab';
 import PreliminaryTab from './PreliminaryTab';
 import SeniorReviewTab from './SeniorReviewTab';
 import ApprovalTab from './ApprovalTab';
-import { BankSubmissionTab, SanctionDisbursementTab } from './BankLoanTabs';
 import TimelineTab from './TimelineTab';
 
 /**
@@ -14,8 +13,7 @@ import TimelineTab from './TimelineTab';
  * (ctx = { c, me, can, isClient }); the API independently authorises every request each tab makes.
  */
 const hasRole = (me, ...codes) => me.context.roles.some((r) => codes.includes(r.code));
-const AFTER_FINAL = ['FINAL_APPROVED', 'CLIENT_APPROVAL_PENDING', 'CLIENT_QUERY_RAISED', 'CLIENT_APPROVED', 'CLIENT_SIGNED', 'SUBMITTED_TO_BANK', 'LOAN_SANCTIONED', 'DISBURSED', 'CASE_COMPLETED'];
-const AT_BANK = ['SUBMITTED_TO_BANK', 'LOAN_SANCTIONED', 'DISBURSED', 'CASE_COMPLETED', 'CASE_REJECTED'];
+const AFTER_FINAL = ['FINAL_APPROVED', 'PAYMENT_PENDING', 'CASE_COMPLETED'];
 
 export const CASE_TABS = [
   { key: 'overview', label: 'Overview', Component: OverviewTab, show: () => true },
@@ -30,8 +28,11 @@ export const CASE_TABS = [
     Component: SeniorReviewTab,
     show: ({ me, c, isClient }) => !isClient && (hasRole(me, 'FIRM_ADMIN', 'JUNIOR_REVIEWER', 'SENIOR_REVIEWER') || AFTER_FINAL.includes(c.status)),
   },
-  { key: 'approval', label: 'Signature & client approval', Component: ApprovalTab, show: ({ c, isClient, me }) => isClient || hasRole(me, 'FIRM_ADMIN', 'SENIOR_REVIEWER', 'MARKETING') || AFTER_FINAL.includes(c.status) },
-  { key: 'bank', label: 'Bank submission', Component: BankSubmissionTab, show: ({ c, isClient }) => !isClient || AT_BANK.includes(c.status) },
-  { key: 'loan', label: 'Sanction & disbursement', Component: SanctionDisbursementTab, show: ({ c }) => AT_BANK.includes(c.status) },
+  {
+    key: 'approval',
+    label: 'Final report & payment',
+    Component: ApprovalTab,
+    show: ({ c, isClient, me }) => (isClient ? c.status === 'CASE_COMPLETED' : hasRole(me, 'FIRM_ADMIN', 'SENIOR_REVIEWER', 'MARKETING') || AFTER_FINAL.includes(c.status)),
+  },
   { key: 'timeline', label: 'Activity timeline', Component: TimelineTab, show: () => true },
 ];

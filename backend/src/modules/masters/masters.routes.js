@@ -34,7 +34,7 @@ const bankFields = {
 };
 const bankList = z.strictObject({ ...listQuery, status: z.enum(['ACTIVE', 'INACTIVE']).optional(), institutionType: bankFields.institutionType.optional() });
 
-const categoryBody = z.strictObject({ code, name: str(100).min(2), description: opt(str(400)), engine: z.enum(['LAND_BUILDING', 'PLANT_MACHINERY', 'STOCK']), sortOrder: z.number().int().min(0).max(999).optional() });
+const categoryBody = z.strictObject({ code, name: str(100).min(2), description: opt(str(400)), engine: z.enum(['LAND_BUILDING', 'PLANT_MACHINERY', 'STOCK', 'FLAT']), sortOrder: z.number().int().min(0).max(999).optional() });
 const categoryUpdate = z.strictObject({ name: str(100).min(2).optional(), description: opt(str(400)), active: z.boolean().optional(), sortOrder: z.number().int().min(0).max(999).optional() });
 const fieldBody = z.strictObject({
   key: str(60).regex(/^[a-z][A-Za-z0-9]{1,59}$/, 'Key: camelCase letters/digits'),
@@ -52,7 +52,7 @@ const docTypeUpdate = z.strictObject({ name: str(120).min(2).optional(), default
 const workflowBody = z.strictObject({
   slaHours: z.partialRecord(z.enum(ALL_STATUSES), z.number().int().min(0).max(24 * 90)).optional(),
   options: z
-    .strictObject({ autoAssign: z.enum(['MANUAL', 'LEAST_LOADED']), requireSourceDocument: z.boolean(), minInspectionPhotos: z.number().int().min(0).max(50), autoReleaseToClient: z.boolean().optional() })
+    .strictObject({ autoAssign: z.enum(['MANUAL', 'LEAST_LOADED']), requireSourceDocument: z.boolean(), minInspectionPhotos: z.number().int().min(0).max(50), autoReleaseToClient: z.boolean().optional() /* retired option, ignored */ })
     .optional(),
 });
 const inactive = z.strictObject({ includeInactive: z.enum(['true', 'false']).optional() });

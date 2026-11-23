@@ -1,7 +1,7 @@
 import { redis } from '../../src/database/redis.js';
 import { closeRenderer } from '../../src/services/pdf/pdf-renderer.js';
 import { api, app, as, prisma, request } from '../helpers.js';
-import { completeFinal, completeInspection, completePreliminary, createCaseWithTeam, PDF, setupFirm, signAndRelease } from '../fixtures.js';
+import { completeFinal, completeInspection, completePreliminary, createCaseWithTeam, PDF, setupFirm, signFinalReport } from '../fixtures.js';
 
 /**
  * VAPT-style regression suite: cross-tenant IDOR sweep, injection, XSS storage, traversal, information
@@ -18,10 +18,10 @@ beforeAll(async () => {
   await completeInspection(A, c.id);
   await completePreliminary(A, c.id);
   await completeFinal(A, c.id);
-  await signAndRelease(A, c.id);
+  const req = await as(A.mk.token).post(`/cases/${c.id}/document-requests`, { title: 'PAN copy' }); // before completion
+  await signFinalReport(A, c.id);
   const doc = await prisma.caseDocument.findFirst({ where: { caseId: c.id } });
   const sig = await prisma.digitalSignature.findFirst({ where: { caseId: c.id } });
-  const req = await as(A.mk.token).post(`/cases/${c.id}/document-requests`, { title: 'PAN copy' });
   Object.assign(ids, { caseId: c.id, documentId: doc.id, signatureId: sig.id, requestId: req.body.id, clientId: A.client.id, bankId: A.bank.id, employeeId: A.fo.employee.id });
 }, 300_000);
 
@@ -53,7 +53,8 @@ describe('IDOR / tenant isolation sweep (VAPT AC-01..AC-04)', () => {
       b.post(`/cases/${ids.caseId}/transitions`, { action: 'HOLD', remarks: 'cross-tenant' }),
       b.post(`/cases/${ids.caseId}/assignments`, { stage: 'FIELD', employeeId: B.fo.employee.id }),
       b.put(`/cases/${ids.caseId}/property`, { data: {} }),
-      b.post(`/cases/${ids.caseId}/approval/release`),
+      b.get(`/cases/${ids.caseId}/approval`),
+      b.post(`/cases/${ids.caseId}/signatures/valuer`, { password: 'x', consent: true }),
     ];
     const results = await Promise.all(probes);
     results.forEach((r) => expect(r.status).toBe(404));

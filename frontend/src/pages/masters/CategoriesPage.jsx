@@ -43,6 +43,7 @@ function NewCategoryDialog({ onClose }) {
             <Label htmlFor="cat-engine">Calculation engine</Label>
             <NativeSelect id="cat-engine" className="mt-1.5" value={v.engine} onChange={(e) => setV({ ...v, engine: e.target.value })}>
               <option value="LAND_BUILDING">Land & building</option>
+              <option value="FLAT">Residential flat (bank composite rate)</option>
               <option value="PLANT_MACHINERY">Plant & machinery</option>
               <option value="STOCK">Stock</option>
             </NativeSelect>

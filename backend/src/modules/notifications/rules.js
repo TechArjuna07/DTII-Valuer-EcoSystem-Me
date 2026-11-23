@@ -5,8 +5,8 @@ import { notify } from './notifications.service.js';
 /**
  * Notification rules: domain events → recipients + message. Registered once at start-up.
  * Covers: new case, inspection assigned / scheduled / completed, preliminary submitted (senior review pending),
- * returned for correction, final approved, client approval required, client query, signature completed,
- * bank submission, loan sanctioned / declined, disbursed, hold / cancel / reject / overdue, document requests.
+ * returned for correction, final approved (awaiting signature), report signed / case completed,
+ * hold / cancel / reject / overdue, document requests.
  */
 
 async function firmAdmins(firmId) {
@@ -32,14 +32,8 @@ const ON_STATUS = {
   PRELIMINARY_SUBMITTED: { who: ['SENIOR'], unassignedFallback: 'SENIOR', title: 'Senior review pending', body: (c) => `The preliminary valuation of ${c.caseNumber} has been submitted for your review.`, tab: 'senior' },
   SENT_BACK_FOR_CORRECTION: { who: ['JUNIOR'], title: 'Valuation returned for correction', body: (c) => `The senior reviewer returned ${c.caseNumber} for correction.`, tab: 'preliminary' },
   FINAL_APPROVED: { who: ['ADMINS', 'MARKETING', 'SENIOR'], title: 'Final report approved', body: (c) => `The final valuation report of ${c.caseNumber} is approved and awaits the valuer's signature.`, tab: 'approval' },
-  CLIENT_APPROVAL_PENDING: { who: ['CLIENT'], title: 'Your valuation report is ready for review', body: (c) => `Please review the valuation report ${c.caseNumber}, then approve it or raise a query.`, tab: 'approval' },
-  CLIENT_QUERY_RAISED: { who: ['SENIOR', 'MARKETING', 'ADMINS'], title: 'Client raised a query', body: (c) => `${c.client.name} raised a query on the report ${c.caseNumber}.`, tab: 'approval' },
-  CLIENT_APPROVED: { who: ['CLIENT'], title: 'Please sign your valuation report', body: (c) => `Thank you for approving ${c.caseNumber}. Please sign the acknowledgement.`, tab: 'approval' },
-  CLIENT_SIGNED: { who: ['MARKETING', 'ADMINS'], title: 'Digital signature completed', body: (c) => `${c.client.name} signed the report ${c.caseNumber}. It is ready for bank submission.`, tab: 'bank' },
-  SUBMITTED_TO_BANK: { who: ['ADMINS', 'CLIENT'], title: 'Report submitted to the bank', body: (c) => `The valuation report ${c.caseNumber} was submitted to ${c.bank.shortCode}.`, tab: 'bank' },
-  LOAN_SANCTIONED: { who: ['ADMINS', 'CLIENT'], title: 'Loan sanctioned', body: (c) => `${c.bank.shortCode} sanctioned the loan for case ${c.caseNumber}.`, tab: 'loan' },
-  DISBURSED: { who: ['ADMINS', 'CLIENT'], title: 'Loan disbursed', body: (c) => `The loan for ${c.caseNumber} has been fully disbursed.`, tab: 'loan' },
-  CASE_COMPLETED: { who: ['CLIENT'], title: 'Case completed', body: (c) => `Valuation case ${c.caseNumber} is complete. Your signed documents remain available in the portal.`, tab: 'overview' },
+  PAYMENT_PENDING: { who: ['MARKETING', 'ADMINS'], title: 'Report signed - payment pending', body: (c) => `The valuation report ${c.caseNumber} is signed. Record the payment once the fee is received to complete the case.`, tab: 'approval' },
+  CASE_COMPLETED: { who: ['CLIENT', 'MARKETING', 'ADMINS'], title: 'Valuation report issued', body: (c) => `The digitally signed valuation report ${c.caseNumber} is ready and can be downloaded from the case.`, tab: 'approval' },
   CASE_ON_HOLD: { who: ['MARKETING', 'FIELD', 'JUNIOR', 'SENIOR'], title: 'Case put on hold', body: (c) => `${c.caseNumber} is on hold.`, tab: 'timeline' },
   CASE_CANCELLED: { who: ['MARKETING', 'FIELD', 'JUNIOR', 'SENIOR', 'ADMINS'], title: 'Case cancelled', body: (c) => `${c.caseNumber} was cancelled.`, tab: 'timeline' },
   CASE_REJECTED: { who: ['MARKETING', 'ADMINS'], title: 'Case rejected', body: (c) => `${c.caseNumber} was closed as rejected.`, tab: 'timeline' },

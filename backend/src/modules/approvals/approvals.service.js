@@ -15,23 +15,21 @@ import { STATUS } from '../workflow/workflow.definition.js';
 import { activeAssignments, lockCase, recordActivity, transition } from '../workflow/workflow.service.js';
 import { storeVersion } from '../documents/documents.service.js';
 import { setSignatureLookup } from '../valuations/valuations.service.js';
+import { getReportSettings } from '../firm/report-settings.js';
 
 /**
- * Client approval & digital signatures (docs/PHASE_1 §11 D3/D4):
- *   1. The senior reviewer (valuer) signs the approved final report.            FINAL_APPROVED
- *   2. The report is released to the client (needs the valuer signature).        → CLIENT_APPROVAL_PENDING
- *   3. The client verifies the facts and approves, or raises a query.          → CLIENT_APPROVED / CLIENT_QUERY_RAISED
- *   4. The client signs an acknowledgement of the (valuer-signed) report.      → CLIENT_SIGNED (system transition)
+ * Final report signature and fee payment:
+ *   1. The senior reviewer (valuer) digitally signs the approved final report.   FINAL_APPROVED -> PAYMENT_PENDING
+ *   2. Staff record that the fee is received ("Payment received"; a payment gateway later).  -> CASE_COMPLETED
+ *      Completing the case shares the signed report with the client portal.
  * Signing always re-authenticates the signer (password) and records explicit consent, IP and timestamps.
  */
 const emitAll = (events) => events.forEach(([n, p]) => emit(n, p));
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 const isPortalClient = (p) => !!p.clientId && !p.employeeId;
 
-const CONSENT = {
-  VALUER: (name, caseNumber, version) => `I, ${name}, as valuer, have prepared/verified valuation report ${caseNumber} version ${version} and sign it electronically. My signature is recorded with date, time and IP address.`,
-  CLIENT: (name, caseNumber) => `I, ${name}, acknowledge receipt of valuation report ${caseNumber} and confirm that the property particulars stated in it are correct to my knowledge. My signature is recorded with date, time and IP address.`,
-};
+const CONSENT = (name, caseNumber, version) =>
+  `I, ${name}, as valuer, have prepared/verified valuation report ${caseNumber} version ${version} and sign it electronically. My signature is recorded with date, time and IP address.`;
 
 async function finalState(caseId) {
   const report = await prisma.valuationReport.findUnique({ where: { caseId_stage: { caseId, stage: 'FINAL' } } });
@@ -65,25 +63,22 @@ const toSignature = (s) => ({
 async function getApproval(principal, caseId) {
   const c = await findVisibleCase(principal, caseId, prisma, { bank: true });
   const portal = isPortalClient(principal);
-  const released = [STATUS.CLIENT_APPROVAL_PENDING, STATUS.CLIENT_QUERY_RAISED, STATUS.CLIENT_APPROVED, STATUS.CLIENT_SIGNED, STATUS.SUBMITTED_TO_BANK, STATUS.LOAN_SANCTIONED, STATUS.DISBURSED, STATUS.CASE_COMPLETED].includes(c.status);
-  if (portal && !released) return { caseStatus: c.status, released: false, finalReport: null, approvals: [], signatures: [], permissions: {} };
+  const released = c.status === STATUS.CASE_COMPLETED;
+  if (portal && !released) return { caseStatus: c.status, released: false, finalReport: null, signatures: [], permissions: {} };
   const { report, version, doc, docVersion } = await finalState(caseId);
-  const [approvals, signatures, assignments] = await Promise.all([
-    prisma.clientApproval.findMany({ where: { caseId }, orderBy: { createdAt: 'desc' } }),
-    prisma.digitalSignature.findMany({ where: { caseId, ...(portal ? { status: 'SIGNED' } : {}) }, orderBy: { requestedAt: 'desc' } }),
+  const [signatures, assignments] = await Promise.all([
+    prisma.digitalSignature.findMany({ where: { caseId, signerRole: 'VALUER', ...(portal ? { status: 'SIGNED' } : {}) }, orderBy: { requestedAt: 'desc' } }),
     activeAssignments(prisma, caseId),
   ]);
   const isSenior = assignments.some((a) => a.stage === 'SENIOR' && a.employeeId === principal.employeeId);
-  const isAdmin = principal.roles.includes(ROLES.FIRM_ADMIN);
-  const valuerSigned = signatures.find((s) => s.signerRole === 'VALUER' && s.status === 'SIGNED' && s.signedVersionId === doc?.currentVersionId);
-  const pendingValuer = signatures.find((s) => s.signerRole === 'VALUER' && s.status === 'PENDING');
-  const pendingClient = signatures.find((s) => s.signerRole === 'CLIENT' && s.status === 'PENDING');
+  const payments = portal ? [] : await prisma.casePayment.findMany({ where: { caseId }, orderBy: { createdAt: 'asc' } });
+  const valuerSigned = signatures.find((s) => s.status === 'SIGNED' && s.signedVersionId === doc?.currentVersionId);
+  const pendingValuer = signatures.find((s) => s.status === 'PENDING');
   const provider = getSignatureProvider();
   const me = await prisma.user.findUnique({ where: { id: principal.userId }, select: { fullName: true } });
   return {
     caseStatus: c.status,
     released,
-    requiresClientApproval: c.bank.requiresClientApproval,
     provider: { name: provider.name, legallyValid: provider.legallyValid, synchronous: provider.synchronous },
     finalReport: version
       ? {
@@ -99,16 +94,53 @@ async function getApproval(principal, caseId) {
           valuerSigned: !!valuerSigned,
         }
       : null,
-    approvals: approvals.map((a) => ({ id: a.id, decision: a.decision, comments: a.comments, createdAt: a.createdAt })),
     signatures: signatures.map(toSignature),
-    consentText: portal ? CONSENT.CLIENT(me.fullName, c.caseNumber) : version ? CONSENT.VALUER(me.fullName, c.caseNumber, version.version) : null,
+    consentText: !portal && version ? CONSENT(me.fullName, c.caseNumber, version.version) : null,
+    payment: portal
+      ? null
+      : {
+          expectedAmount: await expectedFee(c.firmId, version),
+          payments: payments.map((p) => ({ id: p.id, amount: Number(p.amount), receivedOn: p.receivedOn, mode: p.mode, source: p.source, reference: p.reference, remarks: p.remarks, createdAt: p.createdAt })),
+        },
     permissions: {
+      canRecordPayment: !portal && hasPermission(principal, 'payment.record') && c.status === STATUS.PAYMENT_PENDING,
       canValuerSign: !portal && isSenior && hasPermission(principal, 'signature.valuer') && c.status === STATUS.FINAL_APPROVED && !!docVersion && !valuerSigned && !pendingValuer,
-      canRelease: !portal && (isSenior || isAdmin) && hasPermission(principal, 'report.release') && c.status === STATUS.FINAL_APPROVED && !!valuerSigned && c.bank.requiresClientApproval,
-      canDecide: portal && principal.clientId === c.clientId && hasPermission(principal, 'client.approve') && c.status === STATUS.CLIENT_APPROVAL_PENDING,
-      canClientSign: portal && principal.clientId === c.clientId && hasPermission(principal, 'signature.client') && c.status === STATUS.CLIENT_APPROVED && !pendingClient,
     },
   };
+}
+
+/** Fee incl. GST from the final report's proforma invoice (null when no fee was entered). */
+async function expectedFee(firmId, version) {
+  const fee = Number(version?.inputs?.invoice?.fee ?? 0);
+  if (!fee) return null;
+  const { billing } = await getReportSettings(firmId);
+  const half = Math.round(((fee * Number(billing.gstRatePct ?? 18)) / 100 / 2) * 100) / 100;
+  return Math.round((fee + half * 2) * 100) / 100;
+}
+
+/**
+ * "Payment received": records the fee payment (MANUAL today; GATEWAY later through the same function) and completes
+ * the case, sharing the signed final report with the client.
+ */
+async function recordPayment(principal, caseId, { amount, receivedOn, mode, reference, remarks }, req, { source = 'MANUAL', gatewayRef = null } = {}) {
+  const view = await getApproval(principal, caseId);
+  if (source === 'MANUAL' && !view.permissions.canRecordPayment) {
+    throw Forbidden(view.caseStatus === STATUS.PAYMENT_PENDING ? 'You cannot record payments' : 'Payment can be recorded only after the report is signed');
+  }
+  const { doc } = await finalState(caseId);
+  const events = await prisma.$transaction(async (tx) => {
+    const c = await lockCase(tx, principal.firmId, caseId);
+    if (c.status !== STATUS.PAYMENT_PENDING) throw Conflict('This case is not awaiting payment');
+    const payment = await tx.casePayment.create({
+      data: { firmId: c.firmId, caseId, amount, receivedOn, mode, source, reference: reference ?? null, remarks: remarks ?? null, gatewayRef, recordedById: principal.userId },
+    });
+    if (doc) await tx.caseDocument.update({ where: { id: doc.id }, data: { visibility: 'CLIENT' } });
+    const t = await transition(tx, principal, c, 'RECORD_PAYMENT', { req, remarks: remarks ?? null, meta: { paymentId: payment.id, amount: Number(amount), mode, source } });
+    await recordAudit({ action: 'PAYMENT_RECORDED', principal, req, entityType: 'case_payment', entityId: payment.id, meta: { caseId, amount: Number(amount), mode, source } }, tx);
+    return t.events;
+  });
+  emitAll(events);
+  return getApproval(principal, caseId);
 }
 
 async function reauthenticate(principal, password) {
@@ -122,11 +154,11 @@ async function reauthenticate(principal, password) {
  * VALUER signatures produce a new version of the final report document; CLIENT signatures are filed into
  * 07_Client_Signed_Files and complete the CLIENT_SIGNED transition.
  */
-async function sign(principal, caseId, role, { password, consent }, req) {
+async function sign(principal, caseId, { password, consent }, req) {
+  const role = 'VALUER';
   if (!consent) throw BadRequest('You must confirm the declaration to sign');
   const view = await getApproval(principal, caseId);
-  if (role === 'VALUER' && !view.permissions.canValuerSign) throw Forbidden('You cannot sign this report now');
-  if (role === 'CLIENT' && !view.permissions.canClientSign) throw Forbidden('You cannot sign this report now');
+  if (!view.permissions.canValuerSign) throw Forbidden('You cannot sign this report now');
   const user = await reauthenticate(principal, password);
   const { doc, docVersion, version } = await finalState(caseId);
   const source = await storage.getBuffer(docVersion.storageKey);
@@ -161,7 +193,7 @@ async function sign(principal, caseId, role, { password, consent }, req) {
           throw ServiceUnavailable(e.message);
         }
         const s = await tx.digitalSignature.create({ data: { ...base, providerRef: started.providerRef, status: 'PENDING' } });
-        await recordActivity(tx, { c, principal, action: `${role}_SIGNATURE_REQUESTED`, meta: { signatureId: s.id, provider: provider.name }, req, clientVisible: role === 'CLIENT', actorRole: role === 'CLIENT' ? ROLES.CLIENT : ROLES.SENIOR_REVIEWER });
+        await recordActivity(tx, { c, principal, action: 'VALUER_SIGNATURE_REQUESTED', meta: { signatureId: s.id, provider: provider.name }, req, actorRole: ROLES.SENIOR_REVIEWER });
         return [];
       }
       const result = provider.signNow({ documentSha256: docVersion.sha256, signerUserId: user.id, signerName: user.fullName, signerRole: role, caseNumber: c.caseNumber });
@@ -194,17 +226,17 @@ async function completeSignature(tx, principal, c, record, { source, doc, signed
       consentText: record.consentText,
       legallyValid: record.legallyValid,
     }));
-  const isValuer = record.signerRole === 'VALUER';
+  // The valuer-signed report stays internal until the fee is received (recordPayment shares it with the client).
   const stored = await storeVersion({
-    principal: isValuer ? principal : null,
+    principal,
     c,
-    folder: isValuer ? 'FINAL_VALUATION_REPORT' : 'CLIENT_SIGNED_FILES',
-    content: { buffer: pdf, fileName: `${c.caseNumber}_${isValuer ? 'Valuation_Report_valuer_signed' : 'Valuation_Report_client_signed'}.pdf`, mimeType: 'application/pdf' },
-    title: isValuer ? doc.title : 'Signed valuation report',
-    documentId: isValuer ? doc.id : null,
-    visibility: isValuer ? 'INTERNAL' : 'CLIENT',
+    folder: 'FINAL_VALUATION_REPORT',
+    content: { buffer: pdf, fileName: `${c.caseNumber}_Valuation_Report_signed.pdf`, mimeType: 'application/pdf' },
+    title: doc.title,
+    documentId: doc.id,
+    visibility: 'INTERNAL',
     uploadSource: 'SIGNATURE',
-    note: `${record.signerRole.toLowerCase()} signature via ${record.provider}`,
+    note: `valuer signature via ${record.provider}`,
     req,
     tx,
   });
@@ -213,71 +245,22 @@ async function completeSignature(tx, principal, c, record, { source, doc, signed
   const sig = record.id ? await tx.digitalSignature.update({ where: { id: record.id }, data }) : await tx.digitalSignature.create({ data });
   await recordActivity(tx, {
     c,
-    principal: isValuer ? principal : null,
-    action: `${record.signerRole}_SIGNATURE_COMPLETED`,
+    principal,
+    action: 'VALUER_SIGNATURE_COMPLETED',
     documentVersionId: stored.version.id,
     meta: { signatureId: sig.id, provider: record.provider, legallyValid: record.legallyValid },
     req,
     clientVisible: true,
-    actorRole: isValuer ? ROLES.SENIOR_REVIEWER : ROLES.CLIENT,
+    actorRole: ROLES.SENIOR_REVIEWER,
   });
   await recordAudit({ action: 'DIGITAL_SIGNATURE_COMPLETED', firmId: c.firmId, actorId: record.signerUserId, actorRole: record.signerRole, req, entityType: 'digital_signature', entityId: sig.id, meta: { caseId: c.id, provider: record.provider } }, tx);
   const events = [...stored.events, ['signature.completed', { firmId: c.firmId, caseId: c.id, role: record.signerRole, signatureId: sig.id, actorId: record.signerUserId }]];
-  if (isValuer) events.push(...(await autoRelease(tx, principal, c.id, doc.id, stored.version.id, req)));
-  if (!isValuer) {
-    const fresh = await tx.valuationCase.findUnique({ where: { id: c.id }, include: { bank: true } });
-    const t = await transition(tx, null, fresh, 'CLIENT_SIGNATURE_COMPLETED', { system: true, documentVersionId: stored.version.id, req });
+  const fresh = await tx.valuationCase.findUnique({ where: { id: c.id }, include: { bank: true } });
+  if (fresh.status === STATUS.FINAL_APPROVED) {
+    const t = await transition(tx, principal, fresh, 'VALUER_SIGNATURE_COMPLETED', { system: true, documentVersionId: stored.version.id, req });
     events.push(...t.events);
   }
   return events;
-}
-
-/**
- * Senior → client hand-over: once the valuer has signed, the report goes straight to the client for review and
- * acceptance when the lender needs client approval, the client has an active portal login and the firm has not
- * switched off workflowOptions.autoReleaseToClient. Otherwise the senior reviewer / Firm Admin releases it manually.
- */
-async function autoRelease(tx, principal, caseId, documentId, documentVersionId, req) {
-  const c = await tx.valuationCase.findUnique({ where: { id: caseId }, include: { bank: true, client: { select: { userId: true, status: true } } } });
-  const settings = await tx.organizationSettings.findUnique({ where: { firmId: c.firmId }, select: { workflowOptions: true } });
-  if (c.status !== STATUS.FINAL_APPROVED || !c.bank.requiresClientApproval) return [];
-  if ((settings?.workflowOptions?.autoReleaseToClient ?? true) === false) return [];
-  if (!c.client.userId || c.client.status !== 'ACTIVE') return [];
-  await tx.caseDocument.update({ where: { id: documentId }, data: { visibility: 'CLIENT' } });
-  const t = await transition(tx, principal, c, 'RELEASE_TO_CLIENT', { system: true, req, documentVersionId, meta: { automatic: true } });
-  return t.events;
-}
-
-/** Releases the valuer-signed final report to the client portal. */
-async function release(principal, caseId, req) {
-  const view = await getApproval(principal, caseId);
-  if (!view.finalReport?.valuerSigned) throw Conflict('The valuer must sign the final report before it is released');
-  if (!view.permissions.canRelease) throw Forbidden('You cannot release this report now');
-  const { doc } = await finalState(caseId);
-  const events = await prisma.$transaction(async (tx) => {
-    const c = await lockCase(tx, principal.firmId, caseId);
-    await tx.caseDocument.update({ where: { id: doc.id }, data: { visibility: 'CLIENT' } });
-    const t = await transition(tx, principal, c, 'RELEASE_TO_CLIENT', { req, documentVersionId: doc.currentVersionId });
-    return t.events;
-  });
-  emitAll(events);
-  return getApproval(principal, caseId);
-}
-
-/** Client approves the released report or raises a query (comments required). */
-async function decide(principal, caseId, { decision, comments }, req) {
-  const view = await getApproval(principal, caseId);
-  if (!view.permissions.canDecide) throw Forbidden('You cannot respond to this report now');
-  if (decision === 'QUERY' && !(comments && comments.trim().length >= 3)) throw BadRequest('Describe your query');
-  const { version } = await finalState(caseId);
-  const events = await prisma.$transaction(async (tx) => {
-    const c = await lockCase(tx, principal.firmId, caseId);
-    await tx.clientApproval.create({ data: { firmId: c.firmId, caseId, reportVersionId: version.id, decision, comments: comments ?? null, clientUserId: principal.userId, ip: req.ip ? String(req.ip).slice(0, 64) : null, userAgent: req.headers['user-agent']?.slice(0, 400) ?? null } });
-    const t = await transition(tx, principal, c, decision === 'APPROVED' ? 'CLIENT_APPROVE' : 'CLIENT_RAISE_QUERY', { remarks: comments, req, meta: { reportVersion: version.version } });
-    return t.events;
-  });
-  emitAll(events);
-  return getApproval(principal, caseId);
 }
 
 /** Polls an asynchronous provider for a pending signature and completes it when signed. */
@@ -356,4 +339,4 @@ setSignatureLookup(async (documentVersionId) => {
   return [...valuer, ...client].map((x) => ({ role: x.signerRole, name: x.signerName, provider: x.provider, signedAt: x.signedAt, verification: x.verificationStatus, legallyValid: x.legallyValid }));
 });
 
-export { getApproval, sign, release, decide, syncSignature, syncAllPending, verifySignature };
+export { getApproval, sign, recordPayment, syncSignature, syncAllPending, verifySignature };

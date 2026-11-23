@@ -149,7 +149,107 @@ function stock(raw) {
   };
 }
 
-const ENGINES = { LAND_BUILDING: landBuilding, PLANT_MACHINERY: plantMachinery, STOCK: stock };
+// ───────────── Residential flat (composite rate method, SBI / IBA flat format) ─────────────
+const SQFT_PER_SQM = 10.7639;
+const text = (max) => z.string().trim().max(max).optional();
+/** Narrative sections of the flat report (versioned with the calculation; printed verbatim). */
+const flatReport = z
+  .strictObject({
+    purpose: text(300),
+    appointmentDate: text(30),
+    appointingAuthority: text(300),
+    documents: z.array(z.string().trim().min(1).max(600)).max(30).default([]),
+    marketability: text(100),
+    positiveFactors: text(1000),
+    negativeFactors: text(1000),
+    comparableAnalysis: text(3000),
+    adoptedRateNote: text(1500),
+    rateBreakupNote: text(1000),
+    methodology: text(3000),
+    deviationJustification: text(3000),
+    inspectedBy: text(200),
+    place: text(100),
+  })
+  .default({});
+
+const flatInputs = z.strictObject({
+  builtUpArea: z.coerce.number().positive().max(1e7),
+  areaUnit: z.enum(['sq.ft', 'sq.m']).default('sq.ft'),
+  areaBasis: z.string().trim().max(200).default('Built up area'),
+  compositeRate: n(1e8),
+  constructionCostPerUnit: n(1e7),
+  ageYears: n(300),
+  totalLifeYears: z.coerce.number().min(1).max(300).default(60),
+  salvagePct: percent(10),
+  extras: z.array(z.strictObject({ description: z.string().trim().min(1).max(200), amount: n() })).max(20).default([]),
+  realisablePct: percent(98),
+  distressPct: percent(75),
+  bookValue: n().optional(),
+  guidelineRatePerSqM: n().optional(),
+  readyReckonerValue: n().optional(),
+  roundTo: z.coerce.number().int().min(1).max(1_000_000).default(1),
+  report: flatReport,
+  /** Proforma invoice printed as the first page of the report when a fee is entered. */
+  invoice: z.strictObject({ fee: n(1e8).optional(), bankOfficer: text(120) }).default({}),
+});
+
+/**
+ * Flat value = area × (composite market rate − depreciation per unit), where depreciation applies to the
+ * construction cost only: (100 − salvage) / life % per year × age (e.g. 90 / 60 = 1.5 % per year).
+ * Insurance value = construction cost × area; depreciated building value (WDV) = insurance value × remaining ratio.
+ */
+function flat(raw) {
+  const i = flatInputs.parse(raw);
+  const yearlyPct = round2((100 - i.salvagePct) / i.totalLifeYears);
+  const depPct = round2(Math.min(i.ageYears * yearlyPct, 100 - i.salvagePct));
+  const depPerUnit = round2((i.constructionCostPerUnit * depPct) / 100);
+  const netRate = round2(i.compositeRate - depPerUnit);
+  const gross = round2(i.builtUpArea * i.compositeRate);
+  const depAmount = round2(i.builtUpArea * depPerUnit);
+  const extras = i.extras.reduce((sum, e) => sum + e.amount, 0);
+  const marketValue = roundTo(gross - depAmount + extras, i.roundTo);
+  const replacementCost = round2(i.builtUpArea * i.constructionCostPerUnit);
+  const areaSqM = i.areaUnit === 'sq.m' ? i.builtUpArea : round2(i.builtUpArea / SQFT_PER_SQM);
+  const guidelineValue = i.readyReckonerValue ?? (i.guidelineRatePerSqM != null ? roundTo(areaSqM * i.guidelineRatePerSqM, i.roundTo) : null);
+  const lines = [
+    { section: 'Flat', label: `Fair market value with present composite rate — ${i.areaBasis} × market rate`, quantity: i.builtUpArea, unit: i.areaUnit, rate: i.compositeRate, amount: gross },
+    { section: 'Flat', label: `Less: depreciation @ ${yearlyPct}% for ${i.ageYears} years on construction cost @ ₹${i.constructionCostPerUnit.toLocaleString('en-IN')} per ${i.areaUnit}`, rate: depPerUnit, amount: -depAmount },
+    { section: 'Flat', label: 'Fair market value of the flat', rate: netRate, amount: round2(gross - depAmount) },
+    ...i.extras.map((e) => ({ section: 'Extras', label: e.description, amount: round2(e.amount) })),
+  ];
+  return {
+    lines,
+    totals: {
+      marketValue,
+      realisableValue: roundTo(pct(marketValue, i.realisablePct), i.roundTo),
+      distressValue: roundTo(pct(marketValue, i.distressPct), i.roundTo),
+      guidelineValue,
+      insurableValue: roundTo(replacementCost, i.roundTo),
+    },
+    flat: {
+      yearlyDepreciationPct: yearlyPct,
+      depreciationPct: depPct,
+      depreciatedRatioPct: round2(100 - depPct),
+      remainingLifeYears: Math.max(i.totalLifeYears - i.ageYears, 0),
+      depreciationPerUnit: depPerUnit,
+      netRate,
+      replacementCost,
+      depreciatedBuildingValue: round2(replacementCost * (1 - depPct / 100)),
+      areaSqM,
+      bookValue: i.bookValue ?? null,
+      guidelineRatePerSqM: i.guidelineRatePerSqM ?? null,
+      deviationFromGuidelinePct: guidelineValue ? round2(((marketValue - guidelineValue) / guidelineValue) * 100) : null,
+    },
+    assumptions: [
+      `Composite rate method: ₹${i.compositeRate.toLocaleString('en-IN')} per ${i.areaUnit} on ${i.areaBasis.toLowerCase()}, inclusive of land and building`,
+      `Depreciation ${yearlyPct}% per year (salvage ${i.salvagePct}%, life ${i.totalLifeYears} years) on construction cost only`,
+      `Realisable value ${i.realisablePct}% and distress value ${i.distressPct}% of fair market value`,
+    ],
+    inputs: i,
+  };
+}
+
+const ENGINES = { LAND_BUILDING: landBuilding, PLANT_MACHINERY: plantMachinery, STOCK: stock, FLAT: flat };
 
 /** @throws {import('zod').ZodError} on invalid inputs */
 function calculate(engine, inputs) {

@@ -169,7 +169,7 @@ async function listFinancialYears() {
 
 // ───────────── Workflow configuration ─────────────
 
-const DEFAULT_WORKFLOW = { autoAssign: 'MANUAL', requireSourceDocument: false, minInspectionPhotos: 3, autoReleaseToClient: true };
+const DEFAULT_WORKFLOW = { autoAssign: 'MANUAL', requireSourceDocument: false, minInspectionPhotos: 3 };
 
 async function getWorkflowSettings(principal) {
   const s = await prisma.organizationSettings.findUnique({ where: { firmId: principal.firmId } });

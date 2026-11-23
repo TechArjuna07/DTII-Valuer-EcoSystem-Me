@@ -33,10 +33,19 @@ async function assertFieldOfficer(principal, c) {
 // ───────────── Property details ─────────────
 
 /** Marketing / admin may edit property details while the case is open; the field officer during the inspection. */
+/** Reviewers complete / correct the property particulars while they write the report (bank formats need them). */
+const REVIEWER_EDIT = {
+  JUNIOR: [STATUS.PRELIMINARY_VALUATION_IN_PROGRESS, STATUS.SENT_BACK_FOR_CORRECTION],
+  SENIOR: [STATUS.FINAL_REVIEW_IN_PROGRESS],
+};
+
 async function canEditProperty(principal, c) {
   if (TERMINAL.includes(c.status)) return false;
   if (hasPermission(principal, 'case.create')) return true;
-  return EDITABLE_STATUSES.includes(c.status) && hasPermission(principal, 'inspection.perform') && isFieldOfficerOf(principal, await fieldAssignee(c.id));
+  if (EDITABLE_STATUSES.includes(c.status) && hasPermission(principal, 'inspection.perform') && isFieldOfficerOf(principal, await fieldAssignee(c.id))) return true;
+  if (!principal.employeeId) return false;
+  const mine = await prisma.caseAssignment.findMany({ where: { caseId: c.id, employeeId: principal.employeeId, endedAt: null, stage: { in: ['JUNIOR', 'SENIOR'] } }, select: { stage: true } });
+  return mine.some((a) => REVIEWER_EDIT[a.stage].includes(c.status));
 }
 
 async function getProperty(principal, caseId) {

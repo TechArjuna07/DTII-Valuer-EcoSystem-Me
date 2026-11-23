@@ -7,10 +7,11 @@ import { bullConnection } from '../database/redis.js';
  *   mail         email delivery with retries (5 attempts, exponential back-off)
  *   scan         malware scanning of uploaded versions (SCANNER=clamav)
  *   maintenance  repeatable jobs: SLA / overdue sweep, signature-provider polling
+ *   igr          IGR Maharashtra eASR statement fetches (one at a time platform-wide)
  * Under NODE_ENV=test jobs are recorded in memory (testJobs) instead of being sent to Redis, so tests stay
  * deterministic; processors are exercised directly by the tests.
  */
-const QUEUE_NAMES = ['mail', 'scan', 'maintenance'];
+const QUEUE_NAMES = ['mail', 'scan', 'maintenance', 'igr'];
 const DEFAULT_JOB_OPTIONS = { attempts: 5, backoff: { type: 'exponential', delay: 30_000 }, removeOnComplete: 1000, removeOnFail: 5000 };
 
 const queues = new Map();

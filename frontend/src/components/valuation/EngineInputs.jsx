@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { Button, Input, Label, NativeSelect } from '@/components/ui/primitives';
+import { FlatInputs } from './FlatInputs';
 
 /** Numeric input bound to a nested path of the inputs object. */
 function Num({ label, value, onChange, disabled, step = 'any', suffix }) {
@@ -161,6 +162,7 @@ function ItemsTable({ v, set, disabled, columns, blank }) {
 export function EngineInputs({ engine, value, onChange, disabled }) {
   const set = (path, v) => onChange(setIn(value, path, v));
   if (engine === 'LAND_BUILDING') return <LandBuilding v={value} set={set} disabled={disabled} />;
+  if (engine === 'FLAT') return <FlatInputs v={value} set={set} disabled={disabled} />;
   if (engine === 'PLANT_MACHINERY') {
     return (
       <div className="space-y-4">

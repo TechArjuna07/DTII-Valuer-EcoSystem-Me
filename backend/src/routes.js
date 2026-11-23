@@ -13,9 +13,9 @@ import inspections from './modules/inspections/inspections.routes.js';
 import valuations from './modules/valuations/valuations.routes.js';
 import approvals from './modules/approvals/approvals.routes.js';
 import portal from './modules/portal/portal.routes.js';
-import submissions from './modules/submissions/submissions.routes.js';
 import notifications from './modules/notifications/notifications.routes.js';
 import dashboard from './modules/dashboard/dashboard.routes.js';
+import asr from './modules/asr/asr.routes.js';
 
 /** /api/v1 router. Each module mounts its own router here. */
 const v1 = Router();
@@ -33,9 +33,9 @@ v1.use(inspections);
 v1.use(valuations);
 v1.use(approvals);
 v1.use(portal);
-v1.use(submissions);
 v1.use(notifications);
 v1.use(dashboard);
 v1.use('/cases', cases);
+v1.use('/asr', asr);
 
 export { v1 };

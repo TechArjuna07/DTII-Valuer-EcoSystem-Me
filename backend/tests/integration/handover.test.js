@@ -1,12 +1,12 @@
 import { redis } from '../../src/database/redis.js';
 import { closeRenderer } from '../../src/services/pdf/pdf-renderer.js';
 import { as, createEmployee, prisma } from '../helpers.js';
-import { completeFinal, completeInspection, completePreliminary, setupFirm, signAndRelease } from '../fixtures.js';
+import { completeFinal, completeInspection, completePreliminary, setupFirm, signFinalReport } from '../fixtures.js';
 
 /**
- * Stage hand-over: field officer → junior reviewer → senior reviewer → client.
- * The assignee of a stage picks the next reviewer while that stage is unassigned; the valuer-signed report goes to
- * the client automatically.
+ * Stage hand-over: field officer → junior reviewer → senior reviewer → signed report.
+ * The assignee of a stage picks the next reviewer while that stage is unassigned; the valuer's signature completes
+ * the case and shares the report with the client.
  */
 
 let fx;
@@ -77,8 +77,8 @@ describe('field officer → junior reviewer', () => {
   }, 60_000);
 });
 
-describe('junior reviewer → senior reviewer → client', () => {
-  test('the junior picks the senior on submission; the signed report reaches the client automatically', async () => {
+describe('junior reviewer → senior reviewer → signed report', () => {
+  test('the junior picks the senior on submission; the signature of the senior completes the case', async () => {
     const c = await newCase();
     await completeInspection(fx, c.id, { nextAssigneeId: fx.jr.employee.id });
     const jr = as(fx.jr.token);
@@ -93,10 +93,8 @@ describe('junior reviewer → senior reviewer → client', () => {
     await waitFor(() => prisma.notification.findFirst({ where: { recipientId: srUser.userId, caseId: c.id, event: 'ASSIGNED_SENIOR' } }));
 
     await completeFinal(fx, c.id);
-    const signed = await signAndRelease(fx, c.id);
-    expect(signed.body.caseStatus).toBe('CLIENT_APPROVAL_PENDING');
-    const view = await as(fx.client.token).get(`/cases/${c.id}/approval`);
-    expect(view.body.permissions.canDecide).toBe(true);
+    const signed = await signFinalReport(fx, c.id);
+    expect(signed.body.caseStatus).toBe('PAYMENT_PENDING');
   }, 120_000);
 
   test('maker-checker: a reviewer holding both roles is never offered as senior on a case they prepared', async () => {

@@ -15,8 +15,8 @@
  *   remarks     a remark is mandatory
  *   clientVisible  shown on the client's portal timeline
  *
- * Firm-level configuration (SLA hours per status, auto-assignment, whether a lender needs client approval) is read
- * from organization_settings / banks — the transition graph itself is fixed to protect case integrity.
+ * Firm-level configuration (SLA hours per status, auto-assignment) is read from organization_settings — the
+ * transition graph itself is fixed to protect case integrity.
  */
 
 const S = Object.freeze({
@@ -29,6 +29,7 @@ const S = Object.freeze({
   FINAL_REVIEW_IN_PROGRESS: 'FINAL_REVIEW_IN_PROGRESS',
   SENT_BACK_FOR_CORRECTION: 'SENT_BACK_FOR_CORRECTION',
   FINAL_APPROVED: 'FINAL_APPROVED',
+  PAYMENT_PENDING: 'PAYMENT_PENDING',
   CLIENT_APPROVAL_PENDING: 'CLIENT_APPROVAL_PENDING',
   CLIENT_QUERY_RAISED: 'CLIENT_QUERY_RAISED',
   CLIENT_APPROVED: 'CLIENT_APPROVED',
@@ -44,7 +45,13 @@ const S = Object.freeze({
 
 const TERMINAL = [S.CASE_COMPLETED, S.CASE_CANCELLED, S.CASE_REJECTED];
 const ALL = Object.values(S);
-const ACTIVE = ALL.filter((s) => !TERMINAL.includes(s) && s !== S.CASE_ON_HOLD);
+/**
+ * Retired steps (client approval / signature, bank submission, sanction, disbursement). The case now ends when the
+ * senior reviewer digitally signs the approved final report. The values stay in the database enum so historic
+ * status history keeps its meaning; a case still in one of them can only be closed (CLOSE_CASE).
+ */
+const LEGACY = [S.CLIENT_APPROVAL_PENDING, S.CLIENT_QUERY_RAISED, S.CLIENT_APPROVED, S.CLIENT_SIGNED, S.SUBMITTED_TO_BANK, S.LOAN_SANCTIONED, S.DISBURSED];
+const ACTIVE = ALL.filter((s) => !TERMINAL.includes(s) && s !== S.CASE_ON_HOLD && !LEGACY.includes(s));
 
 /** Ordered pipeline (for progress display and "statusGroup" filters). */
 const PIPELINE = [
@@ -56,12 +63,7 @@ const PIPELINE = [
   S.PRELIMINARY_SUBMITTED,
   S.FINAL_REVIEW_IN_PROGRESS,
   S.FINAL_APPROVED,
-  S.CLIENT_APPROVAL_PENDING,
-  S.CLIENT_APPROVED,
-  S.CLIENT_SIGNED,
-  S.SUBMITTED_TO_BANK,
-  S.LOAN_SANCTIONED,
-  S.DISBURSED,
+  S.PAYMENT_PENDING,
   S.CASE_COMPLETED,
 ];
 
@@ -70,9 +72,8 @@ const STATUS_GROUPS = Object.freeze({
   INSPECTION: [S.INSPECTION_ASSIGNED, S.INSPECTION_IN_PROGRESS],
   PRELIMINARY: [S.INSPECTION_COMPLETED, S.PRELIMINARY_VALUATION_IN_PROGRESS, S.SENT_BACK_FOR_CORRECTION],
   SENIOR_REVIEW: [S.PRELIMINARY_SUBMITTED, S.FINAL_REVIEW_IN_PROGRESS],
-  CLIENT: [S.FINAL_APPROVED, S.CLIENT_APPROVAL_PENDING, S.CLIENT_QUERY_RAISED, S.CLIENT_APPROVED],
-  BANK: [S.CLIENT_SIGNED, S.SUBMITTED_TO_BANK],
-  LOAN: [S.LOAN_SANCTIONED, S.DISBURSED],
+  AWAITING_SIGNATURE: [S.FINAL_APPROVED],
+  AWAITING_PAYMENT: [S.PAYMENT_PENDING],
   CLOSED: TERMINAL,
   ON_HOLD: [S.CASE_ON_HOLD],
   ACTIVE,
@@ -86,23 +87,20 @@ const TRANSITIONS = [
   T('SUBMIT_INSPECTION', S.INSPECTION_IN_PROGRESS, S.INSPECTION_COMPLETED, 'inspection.submit', { stage: 'FIELD', clientVisible: true }),
   T('START_PRELIMINARY', [S.INSPECTION_COMPLETED, S.SENT_BACK_FOR_CORRECTION], S.PRELIMINARY_VALUATION_IN_PROGRESS, 'valuation.prepare', { stage: 'JUNIOR', generic: true }),
   T('SUBMIT_PRELIMINARY', S.PRELIMINARY_VALUATION_IN_PROGRESS, S.PRELIMINARY_SUBMITTED, 'valuation.submit', { stage: 'JUNIOR' }),
-  T('START_FINAL_REVIEW', [S.PRELIMINARY_SUBMITTED, S.CLIENT_QUERY_RAISED], S.FINAL_REVIEW_IN_PROGRESS, 'valuation.review', { stage: 'SENIOR', generic: true }),
+  T('START_FINAL_REVIEW', S.PRELIMINARY_SUBMITTED, S.FINAL_REVIEW_IN_PROGRESS, 'valuation.review', { stage: 'SENIOR', generic: true }),
   T('RETURN_FOR_CORRECTION', S.FINAL_REVIEW_IN_PROGRESS, S.SENT_BACK_FOR_CORRECTION, 'valuation.review', { stage: 'SENIOR', remarks: true }),
   T('REQUEST_REINSPECTION', S.FINAL_REVIEW_IN_PROGRESS, S.INSPECTION_IN_PROGRESS, 'valuation.review', { stage: 'SENIOR', remarks: true, generic: true }),
   T('APPROVE_FINAL', S.FINAL_REVIEW_IN_PROGRESS, S.FINAL_APPROVED, 'valuation.approve', { stage: 'SENIOR' }),
   T('REJECT_VALUATION', S.FINAL_REVIEW_IN_PROGRESS, S.CASE_REJECTED, 'valuation.review', { stage: 'SENIOR', remarks: true }),
-  T('RELEASE_TO_CLIENT', S.FINAL_APPROVED, S.CLIENT_APPROVAL_PENDING, 'report.release', { stage: 'SENIOR', adminOverride: true, clientVisible: true }),
-  T('CLIENT_APPROVE', S.CLIENT_APPROVAL_PENDING, S.CLIENT_APPROVED, 'client.approve', { client: true, clientVisible: true }),
-  T('CLIENT_RAISE_QUERY', S.CLIENT_APPROVAL_PENDING, S.CLIENT_QUERY_RAISED, 'client.approve', { client: true, remarks: true, clientVisible: true }),
-  T('CLIENT_SIGNATURE_COMPLETED', S.CLIENT_APPROVED, S.CLIENT_SIGNED, null, { system: true, clientVisible: true }),
-  T('SUBMIT_TO_BANK', [S.CLIENT_SIGNED, S.FINAL_APPROVED], S.SUBMITTED_TO_BANK, 'bank.submit', { stage: 'MARKETING', adminOverride: true, clientVisible: true }),
-  T('RECORD_SANCTION', S.SUBMITTED_TO_BANK, S.LOAN_SANCTIONED, 'loan.update', { stage: 'MARKETING', adminOverride: true, clientVisible: true }),
-  T('RECORD_DECLINE', S.SUBMITTED_TO_BANK, S.CASE_REJECTED, 'loan.update', { stage: 'MARKETING', adminOverride: true, remarks: true, clientVisible: true }),
-  T('RECORD_FINAL_DISBURSEMENT', S.LOAN_SANCTIONED, S.DISBURSED, 'loan.update', { stage: 'MARKETING', adminOverride: true, clientVisible: true }),
-  T('CLOSE_CASE', S.DISBURSED, S.CASE_COMPLETED, 'case.close', { stage: 'MARKETING', adminOverride: true, generic: true, clientVisible: true }),
+  // The senior's digital signature on the approved final report; the case stays open until the fee is received.
+  T('VALUER_SIGNATURE_COMPLETED', S.FINAL_APPROVED, S.PAYMENT_PENDING, null, { system: true, clientVisible: true }),
+  // "Payment received" (staff button today, payment gateway later) completes the case and releases the signed report.
+  T('RECORD_PAYMENT', S.PAYMENT_PENDING, S.CASE_COMPLETED, 'payment.record', { clientVisible: true }),
+  // Only for cases left in a retired step (see LEGACY).
+  T('CLOSE_CASE', LEGACY, S.CASE_COMPLETED, 'case.close', { stage: 'MARKETING', adminOverride: true, generic: true, remarks: true, clientVisible: true }),
   T('HOLD', ACTIVE, S.CASE_ON_HOLD, 'case.hold', { remarks: true, generic: true, clientVisible: true }),
   T('RESUME', S.CASE_ON_HOLD, 'HOLD_ORIGIN', 'case.hold', { generic: true, clientVisible: true }),
-  T('CANCEL', [...ACTIVE, S.CASE_ON_HOLD], S.CASE_CANCELLED, 'case.cancel', { remarks: true, generic: true, clientVisible: true }),
+  T('CANCEL', [...ACTIVE, ...LEGACY, S.CASE_ON_HOLD], S.CASE_CANCELLED, 'case.cancel', { remarks: true, generic: true, clientVisible: true }),
 ];
 
 const byAction = new Map(TRANSITIONS.map((t) => [t.action, t]));
@@ -110,4 +108,4 @@ const byAction = new Map(TRANSITIONS.map((t) => [t.action, t]));
 /** Stage → employee role required for that assignment. */
 const STAGE_ROLE = Object.freeze({ MARKETING: 'MARKETING', FIELD: 'FIELD_OFFICER', JUNIOR: 'JUNIOR_REVIEWER', SENIOR: 'SENIOR_REVIEWER' });
 
-export { S as STATUS, TERMINAL, ACTIVE, ALL as ALL_STATUSES, PIPELINE, STATUS_GROUPS, TRANSITIONS, byAction, STAGE_ROLE };
+export { S as STATUS, TERMINAL, LEGACY, ACTIVE, ALL as ALL_STATUSES, PIPELINE, STATUS_GROUPS, TRANSITIONS, byAction, STAGE_ROLE };

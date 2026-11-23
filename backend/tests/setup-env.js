@@ -23,3 +23,7 @@ process.env.AUTH_THROTTLE_LIMIT_PER_MINUTE = '10000';
 process.env.REFRESH_THROTTLE_LIMIT_PER_MINUTE = '10000';
 process.env.THROTTLE_LIMIT_PER_MINUTE = '100000';
 process.env.UPLOAD_THROTTLE_LIMIT_PER_MINUTE = '100000';
+// IGR eASR: never call the government site from tests — integration tests start a local fake on this port.
+process.env.IGR_EASR_BASE_URL = 'http://127.0.0.1:47811/eASR2.0/';
+process.env.IGR_EASR_MIN_INTERVAL_MS = '0';
+process.env.IGR_EASR_TIMEOUT_MS = '5000';

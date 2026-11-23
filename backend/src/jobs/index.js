@@ -8,6 +8,7 @@ import { processMailJob } from '../modules/notifications/notifications.service.j
 import { scanVersion } from '../modules/documents/documents.service.js';
 import { syncAllPending } from '../modules/approvals/approvals.service.js';
 import { getSignatureProvider } from '../services/signature/provider.js';
+import { processRateSetJob } from '../modules/asr/asr.service.js';
 
 /**
  * Starts the BullMQ workers (RUN_MODE=worker, or in-process with RUN_MODE=all) and schedules repeatable jobs.
@@ -27,14 +28,17 @@ async function startWorkers() {
       },
       { ...opts, concurrency: 1 },
     ),
+    // One eASR statement at a time across all worker processes (the client also spaces every request).
+    new Worker('igr', async (job) => processRateSetJob(job.data), { ...opts, concurrency: 1 }),
   ];
   for (const w of workers) w.on('failed', (job, err) => logger.warn({ queue: w.name, jobId: job?.id, attempts: job?.attemptsMade, err: err.message }, 'Job failed'));
 
+  await getQueue('igr').setGlobalConcurrency(1);
   const maintenance = getQueue('maintenance');
   await maintenance.upsertJobScheduler('sla-sweep', { every: 15 * 60_000 }, { name: 'sla-sweep' });
   if (!getSignatureProvider().synchronous) await maintenance.upsertJobScheduler('signature-sync', { every: 60_000 }, { name: 'signature-sync' });
   else await maintenance.removeJobScheduler('signature-sync').catch(() => undefined);
-  logger.info('Background workers started (mail, scan, maintenance)');
+  logger.info('Background workers started (mail, scan, maintenance, igr)');
 
   return async () => {
     await Promise.all(workers.map((w) => w.close()));

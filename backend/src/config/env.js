@@ -70,6 +70,13 @@ const schema = z
     CLAMAV_HOST: z.string().default('127.0.0.1'),
     CLAMAV_PORT: z.coerce.number().int().default(3310),
 
+    // IGR Maharashtra eASR (Annual Statement of Rates) lookups — fetched on first use, then served from our database.
+    IGR_EASR_ENABLED: bool.prefault('true'),
+    IGR_EASR_BASE_URL: z.url().default('https://igreval.maharashtra.gov.in/eASR2.0/'),
+    IGR_EASR_MIN_INTERVAL_MS: z.coerce.number().int().min(0).max(60_000).default(1500),
+    IGR_EASR_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(30_000),
+    IGR_EASR_REFRESH_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+    IGR_EASR_USER_AGENT: z.string().min(5).max(200).default('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'),
     THROTTLE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(300),
     AUTH_THROTTLE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(20),
     REFRESH_THROTTLE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(120),
