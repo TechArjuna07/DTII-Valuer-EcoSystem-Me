@@ -9,7 +9,7 @@ import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { limiters } from './middleware/rate-limit.js';
 import { errorHandler, notFound } from './middleware/error-handler.js';
-import { v1 } from './routes.js';
+import { MOUNTS, v1 } from './routes.js';
 import { buildOpenApi } from './docs/openapi.js';
 import { registerNotificationRules } from './modules/notifications/rules.js';
 
@@ -91,9 +91,9 @@ function createApp() {
   app.use(API_PREFIX, v1);
 
   if (env.SWAGGER_ENABLED) {
-    const spec = buildOpenApi();
+    const spec = buildOpenApi(MOUNTS);
     app.get(`${DOCS_PATH}/openapi.json`, (_req, res) => res.json(spec));
-    app.use(DOCS_PATH, swaggerUi.serve, swaggerUi.setup(spec, { customSiteTitle: `${env.APP_NAME} API` }));
+    app.use(DOCS_PATH, swaggerUi.serve, swaggerUi.setup(spec, { customSiteTitle: `${env.APP_NAME} API`, swaggerOptions: { persistAuthorization: true, displayRequestDuration: true, tryItOutEnabled: true } }));
   }
 
   app.use(notFound);

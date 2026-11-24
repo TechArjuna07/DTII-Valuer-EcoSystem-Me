@@ -24,7 +24,7 @@ function hasNul(value, depth = 0) {
  * @param {{ body?: import('zod').ZodType, query?: import('zod').ZodType, params?: import('zod').ZodType }} schemas
  */
 function validate(schemas) {
-  return (req, _res, next) => {
+  const mw = (req, _res, next) => {
     req.valid = req.valid || {};
     const errors = [];
     if (['params', 'query', 'body'].some((l) => schemas[l] && hasNul(req[l]))) return next(new HttpError(400, 'Request contains invalid characters'));
@@ -38,6 +38,9 @@ function validate(schemas) {
     if (errors.length) return next(new HttpError(400, errors));
     next();
   };
+  // Read by the OpenAPI generator (src/docs/openapi.js) so Swagger shows exactly what the API validates.
+  mw.docSchemas = schemas;
+  return mw;
 }
 
 export { validate };
