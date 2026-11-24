@@ -20,22 +20,26 @@ import asr from './modules/asr/asr.routes.js';
 /** /api/v1 router. Each module mounts its own router here. */
 const v1 = Router();
 
-v1.use('/health', health);
-v1.use('/auth', auth);
-v1.use('/platform', platform);
-v1.use('/firm', firm);
-v1.use('/employees', employees);
-v1.use('/clients', clients);
-v1.use('/masters', masters);
-v1.use('/files', files);
-v1.use(documents);
-v1.use(inspections);
-v1.use(valuations);
-v1.use(approvals);
-v1.use(portal);
-v1.use(notifications);
-v1.use(dashboard);
-v1.use('/cases', cases);
-v1.use('/asr', asr);
+/** [mount path ('' = root), router] — also read by the OpenAPI generator to document every endpoint. */
+const MOUNTS = [
+  ['/health', health],
+  ['/auth', auth],
+  ['/platform', platform],
+  ['/firm', firm],
+  ['/employees', employees],
+  ['/clients', clients],
+  ['/masters', masters],
+  ['/files', files],
+  ['', documents],
+  ['', inspections],
+  ['', valuations],
+  ['', approvals],
+  ['', portal],
+  ['', notifications],
+  ['', dashboard],
+  ['/cases', cases],
+  ['/asr', asr],
+];
+for (const [path, router] of MOUNTS) (path ? v1.use(path, router) : v1.use(router));
 
-export { v1 };
+export { v1, MOUNTS };

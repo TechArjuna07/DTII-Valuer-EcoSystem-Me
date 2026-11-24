@@ -13,23 +13,27 @@ const parser = multer({
 
 function singleFile(field = 'file') {
   const mw = parser.single(field);
-  return (req, res, next) =>
+  const handler = (req, res, next) =>
     mw(req, res, (err) => {
       if (!err) return req.file ? next() : next(new HttpError(400, `Attach a file in the "${field}" field`));
       if (err.code === 'LIMIT_FILE_SIZE') return next(new HttpError(413, `The file is larger than ${env.UPLOAD_MAX_MB} MB`));
       return next(new HttpError(400, 'Invalid upload: send one file in the "file" field'));
     });
+  handler.docUpload = { field, required: true }; // for the OpenAPI generator
+  return handler;
 }
 
 /** Same as singleFile() but the file is optional (metadata-only submissions are allowed). */
 function optionalFile(field = 'file') {
   const mw = parser.single(field);
-  return (req, res, next) =>
+  const handler = (req, res, next) =>
     mw(req, res, (err) => {
       if (!err) return next();
       if (err.code === 'LIMIT_FILE_SIZE') return next(new HttpError(413, `The file is larger than ${env.UPLOAD_MAX_MB} MB`));
       return next(new HttpError(400, `Invalid upload: send at most one file in the "${field}" field`));
     });
+  handler.docUpload = { field, required: false };
+  return handler;
 }
 
 export { singleFile, optionalFile };
